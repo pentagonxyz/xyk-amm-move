@@ -88,7 +88,7 @@ module XYKAMM {
 
     fun accept<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, init0: Token::Coin<Asset0Type>, init1: Token::Coin<Asset1Type>) {
         let sender = Signer::address_of(account);
-        assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 42);
+        assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 1000);
         move_to(account, Pair<Asset0Type, Asset1Type> { coin0: init0, coin1: init1, totalSupply: 0 })
     }
 
@@ -133,7 +133,7 @@ module XYKAMM {
             liquidity = min(amount0 * pair.totalSupply / reserve0, amount1 * pair.totalSupply / reserve1);
         }
 
-        assert!(liquidity > 0, 42);
+        assert!(liquidity > 0, 1001); // INSUFFICIENT_LIQUIDITY_MINTED
         
         // deposit tokens
         Token::deposit(&mut pair.coin0, coin0);
@@ -155,7 +155,7 @@ module XYKAMM {
         // get amounts to withdraw from burnt liquidity
         amount0 = liquidity * reserve0 / _totalSupply; // using balances ensures pro-rata distribution
         amount1 = liquidity * reserve1 / _totalSupply; // using balances ensures pro-rata distribution
-        assert!(amount0 > 0 && amount1 > 0, 42);
+        assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
         burn_liquidity<Asset0Type, Asset1Type>(account, pool_owner, liquidity);
@@ -221,7 +221,7 @@ module XYKAMM {
         acquires Pair
     {
         // input validation
-        assert!(amount0Out > 0 || amount1Out > 0, 42); // INSUFFICIENT_OUTPUT_AMOUNT
+        assert!(amount0Out > 0 || amount1Out > 0, 1003); // INSUFFICIENT_OUTPUT_AMOUNT
         
         // get pair reserves
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
@@ -229,21 +229,21 @@ module XYKAMM {
         let reserve1 = Token::value(&pair.coin1);
         
         // more validation
-        assert!(amount0Out < reserve0 && amount1Out < reserve1, 42); // INSUFFICIENT_LIQUIDITY
+        assert!(amount0Out < reserve0 && amount1Out < reserve1, 1004); // INSUFFICIENT_LIQUIDITY
 
         // get deposited amounts
         let amount0In = Token::value(&coin0);
         let amount1In = Token::value(&coin1);
         
         // more validation
-        assert!(amount0In > 0 || amount1In > 0, 42); // INSUFFICIENT_INPUT_AMOUNT
+        assert!(amount0In > 0 || amount1In > 0, 1005); // INSUFFICIENT_INPUT_AMOUNT
         
         // validate XY=K
         let balance0 = reserve0 + amount0In - amount0Out;
         let balance1 = reserve1 + amount1In - amount1Out;
         let balance0Adjusted = balance0 * 1000 - (amount0In * 3);
         let balance1Adjusted = balance1 * 1000 - (amount1In * 3);
-        assert!(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 42); // K
+        assert!(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 1006); // K
         
         // deposit tokens
         Token::deposit(&mut pair.coin0, coin0In);
