@@ -81,14 +81,13 @@ module XYKAMM {
         totalSupply: u64
     }
 
-    struct LiquidityRecord<phantom Asset0Type: copy + drop, phantom Asset1Type: copy + drop> has key {
-        // pool owner => amount
-        record: Map::T<address, u64>
+    struct LiquidityAssetType<phantom Asset0Type: copy + drop, phantom Asset1Type: copy + drop> has copy, drop, store {
+        pool_owner: address
     }
 
     fun accept<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, init0: Token::Coin<Asset0Type>, init1: Token::Coin<Asset1Type>) {
         let sender = Signer::address_of(account);
-        assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 1000);
+        assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
         move_to(account, Pair<Asset0Type, Asset1Type> { coin0: init0, coin1: init1, totalSupply: 0 })
     }
 
@@ -111,8 +110,8 @@ module XYKAMM {
         }
     }
 
-    public fun mint<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>): u64
-        acquires Pair, LiquidityRecord
+    public fun mint<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>): Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>
+        acquires Pair
     {
         // get pair reserves
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
@@ -139,43 +138,43 @@ module XYKAMM {
         Token::deposit(&mut pair.coin0, coin0);
         Token::deposit(&mut pair.coin1, coin1);
         
-        // mint liquidity and return minted quantity
-        mint_liquidity<Asset0Type, Asset1Type>(account, pool_owner, liquidity);
-        liquidity
+        // mint liquidity and return it
+        mint_liquidity<Asset0Type, Asset1Type>(pool_owner, liquidity);
     }
 
-    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, liquidity: u64): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
-        acquires Pair, LiquidityRecord
+    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(&mut liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
+        acquires Pair
     {
         // get pair reserves
-        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
+        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(liquidity.type.pool_owner);
         let reserve0 = Token::value(&pair.coin0);
         let reserve1 = Token::value(&pair.coin1);
         
         // get amounts to withdraw from burnt liquidity
-        amount0 = liquidity * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
-        amount1 = liquidity * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
+        let liquidityValue = Token::value(&liquidity);
+        amount0 = liquidityValue * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
+        amount1 = liquidityValue * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
-        burn_liquidity<Asset0Type, Asset1Type>(account, pool_owner, liquidity);
+        burn_liquidity<Asset0Type, Asset1Type>(&mut liquidity);
         
         // withdraw tokens and return
         (Token::withdraw(&mut pair.coin0, amount0), Token::withdraw(&mut pair.coin1, amount1))
     }
     
-    fun mint_liquidity<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, amount: u64)
-        acquires Pair, LiquidityRecord
+    fun mint_liquidity<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, amount: u64): Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>
+        acquires Pair
     {
         increase_total_supply_record<Asset0Type, Asset1Type>(pool_owner, amount);
-        increase_liquidity_record<Asset0Type, Asset1Type>(account, pool_owner, amount);
+        Token::create(LiquidityAssetType<Asset0Type, Asset1Type>{pool_owner}, amount)
     }
     
-    fun burn_liquidity<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, amount: u64)
-        acquires Pair, LiquidityRecord
+    fun burn_liquidity<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>)
+        acquires Pair
     {
-        decrease_total_supply_record<Asset0Type, Asset1Type>(pool_owner, amount);
-        decrease_liquidity_record<Asset0Type, Asset1Type>(account, pool_owner, amount);
+        decrease_total_supply_record<Asset0Type, Asset1Type>(liquidity.type.pool_owner, Token::value(&liquidity));
+        Token::destroy_zero(&mut liquidity);
     }
 
     fun increase_total_supply_record<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, mint_amount: u64)
@@ -192,31 +191,6 @@ module XYKAMM {
         *total_supply_ref = *total_supply_ref - burn_amount
     }
 
-    fun increase_liquidity_record<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, amount: u64)
-        acquires LiquidityRecord
-    {
-        let sender = Signer::address_of(account);
-        if (!exists<LiquidityRecord<Asset0Type, Asset1Type>>(sender)) {
-            move_to(account, LiquidityRecord<Asset0Type, Asset1Type> { record: Map::empty() })
-        };
-        let record = &mut borrow_global_mut<LiquidityRecord<Asset0Type, Asset1Type>>(sender).record;
-        if (Map::contains_key(record, &pool_owner)) {
-            let old_amount = Map::remove(record, &pool_owner);
-            amount = amount + old_amount;
-        };
-        Map::insert(record, pool_owner, amount)
-    }
-
-    fun decrease_liquidity_record<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, amount: u64)
-        acquires LiquidityRecord
-    {
-        let sender = Signer::address_of(account);
-        let record = &mut borrow_global_mut<LiquidityRecord<Asset0Type, Asset1Type>>(sender).record;
-        let old_amount = Map::remove(record, &pool_owner);
-        amount = old_amount - amount;
-        Map::insert(record, pool_owner, amount)
-    }
-    
     public fun swap<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0In: Token::Coin<Asset0Type>, coin1In: Token::Coin<Asset1Type>, amount0Out: u64, amount1Out: u64): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
         acquires Pair
     {
