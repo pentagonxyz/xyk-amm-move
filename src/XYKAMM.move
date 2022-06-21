@@ -153,8 +153,8 @@ module XYKAMM {
         let reserve1 = Token::value(&pair.coin1);
         
         // get amounts to withdraw from burnt liquidity
-        amount0 = liquidity * reserve0 / _totalSupply; // using balances ensures pro-rata distribution
-        amount1 = liquidity * reserve1 / _totalSupply; // using balances ensures pro-rata distribution
+        amount0 = liquidity * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
+        amount1 = liquidity * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
@@ -217,7 +217,7 @@ module XYKAMM {
         Map::insert(record, pool_owner, amount)
     }
     
-    public fun swap<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, coin0In: Token::Coin<Asset0Type>, coin1In: Token::Coin<Asset1Type>, amount0Out: u64, amount1Out: u64): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
+    public fun swap<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0In: Token::Coin<Asset0Type>, coin1In: Token::Coin<Asset1Type>, amount0Out: u64, amount1Out: u64): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
         acquires Pair
     {
         // input validation
