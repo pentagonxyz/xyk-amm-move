@@ -243,7 +243,7 @@ module XYKAMM {
         let balance1 = reserve1 + amount1In - amount1Out;
         let balance0Adjusted = balance0 * 1000 - (amount0In * 3);
         let balance1Adjusted = balance1 * 1000 - (amount1In * 3);
-        assert!(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 1006); // K
+        assert!(balance0Adjusted * balance1Adjusted >= reserve0 * reserve1 * 1000000, 1006); // K
         
         // deposit tokens
         Token::deposit(&mut pair.coin0, coin0In);
