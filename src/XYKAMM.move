@@ -88,6 +88,7 @@ module XYKAMM {
     fun accept<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, init0: Token::Coin<Asset0Type>, init1: Token::Coin<Asset1Type>) {
         let sender = Signer::address_of(account);
         assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
+        assert!(!exists<Pair<Asset1Type, Asset0Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
         move_to(account, Pair<Asset0Type, Asset1Type> { coin0: init0, coin1: init1, totalSupply: 0 })
     }
 
@@ -114,6 +115,7 @@ module XYKAMM {
         acquires Pair
     {
         // get pair reserves
+        assert!(exists<Pair<Asset0Type, Asset1Type>>(pool_owner), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
         let reserve0 = Token::value(&pair.coin0);
         let reserve1 = Token::value(&pair.coin1);
@@ -146,14 +148,15 @@ module XYKAMM {
         acquires Pair
     {
         // get pair reserves
+        assert!(exists<Pair<Asset0Type, Asset1Type>>(liquidity.type.pool_owner), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(liquidity.type.pool_owner);
         let reserve0 = Token::value(&pair.coin0);
         let reserve1 = Token::value(&pair.coin1);
         
         // get amounts to withdraw from burnt liquidity
-        let liquidityValue = Token::value(&liquidity);
-        amount0 = liquidityValue * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
-        amount1 = liquidityValue * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
+        let liquidity_value = Token::value(&liquidity);
+        amount0 = liquidity_value * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
+        amount1 = liquidity_value * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
@@ -191,123 +194,112 @@ module XYKAMM {
         *total_supply_ref = *total_supply_ref - burn_amount
     }
 
-    // swap from asset 0 to asset 1 on a pair
-    public fun swap_0_to_1<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0In: Token::Coin<Asset0Type>): (Token::Coin<Asset1Type>)
+    public fun swap<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: Token::Coin<In>): (Token::Coin<Out>)
         acquires Pair
     {
         // get pair reserves
-        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
-        let reserve0 = Token::value(&pair.coin0);
-        let reserve1 = Token::value(&pair.coin1);
+        let reverse_pair = false;
+        let pair;
+        let reserve_in;
+        let reserve_out;
+
+        if (exists<Pair<In, Out>>(pool_owner)) {
+            pair = borrow_global_mut<Pair<In, Out>>(pool_owner);
+            reserve_in = Token::value(&pair.coin0);
+            reserve_out = Token::value(&pair.coin1);
+        } else {
+            assert!(exists<Pair<Out, In>>(pool_owner), 1006); // PAIR_DOES_NOT_EXIST
+            reverse_pair = true;
+            pair = borrow_global_mut<Pair<Out, In>>(pool_owner);
+            reserve_in = Token::value(&pair.coin1);
+            reserve_out = Token::value(&pair.coin0);
+        }
 
         // get deposited amount
-        let amount0In = Token::value(&coin0);
-        assert!(amount0In > 0, 1003); // INSUFFICIENT_INPUT_AMOUNT
+        let amount_in = Token::value(&coin_in);
+        assert!(amount_in > 0, 1003); // INSUFFICIENT_INPUT_AMOUNT
         
         // get amount out based on XY=K invariant
-        let amountInWithFee = amount0In * 997;
-        let numerator = amountInWithFee * reserve1;
-        let denominator = (reserve0 * 1000) + amountInWithFee;
-        let amount1Out = numerator / denominator;
+        let amount_in_with_fee = amount_in * 997;
+        let numerator = amount_in_with_fee * reserve_out;
+        let denominator = (reserve_in * 1000) + amount_in_with_fee;
+        let amount_out = numerator / denominator;
         
         // more validation
-        assert!(amount1Out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
-        assert!(amount1Out < reserve1, 1005); // INSUFFICIENT_LIQUIDITY
+        assert!(amount_out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+        assert!(amount_out < reserve_out, 1005); // INSUFFICIENT_LIQUIDITY
         
-        // deposit tokens
-        Token::deposit(&mut pair.coin0, coin0In);
-
-        // withdraw tokens and return
-        Token::withdraw(&mut pair.coin1, amount1Out)
+        // deposit input token, withdraw output tokens, and return them
+        if (reverse_pair) {
+            Token::deposit(&mut pair.coin1, coin_in);
+            return Token::withdraw(&mut pair.coin0, amount_out);
+        } else {
+            Token::deposit(&mut pair.coin0, coin_in);
+            return Token::withdraw(&mut pair.coin1, amount_out);
+        }
     }
 
-    // swap from asset 1 to asset 0 on a pair
-    public fun swap_1_to_0<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin1In: Token::Coin<Asset1Type>): (Token::Coin<Asset0Type>)
+    fun get_reserves<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address): (u64, u64)
         acquires Pair
     {
-        // get pair reserves
-        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
-        let reserve0 = Token::value(&pair.coin0);
-        let reserve1 = Token::value(&pair.coin1);
+        let reserve_in;
+        let reserve_out;
 
-        // get deposited amount
-        let amount1In = Token::value(&coin1);
-        assert!(amount1In > 0, 1003); // INSUFFICIENT_INPUT_AMOUNT
-        
-        // get amount out based on XY=K invariant
-        let amountInWithFee = amount1In * 997;
-        let numerator = amountInWithFee * reserve0;
-        let denominator = (reserve1 * 1000) + amountInWithFee;
-        let amount0Out = numerator / denominator;
-        
-        // more validation
-        assert!(amount0Out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
-        assert!(amount0Out < reserve0, 1005); // INSUFFICIENT_LIQUIDITY
-        
-        // deposit tokens
-        Token::deposit(&mut pair.coin1, coin1In);
+        if (exists<Pair<In, Out>>(pool_owner)) {
+            let pair = borrow_global_mut<Pair<In, Out>>(pool_owner);
+            reserve_in = Token::value(&pair.coin0);
+            reserve_out = Token::value(&pair.coin1);
+        } else {
+            assert!(exists<Pair<Out, In>>(pool_owner), 1006); // PAIR_DOES_NOT_EXIST
+            let pair = borrow_global_mut<Pair<Out, In>>(pool_owner);
+            reserve_in = Token::value(&pair.coin1);
+            reserve_out = Token::value(&pair.coin0);
+        }
 
-        // withdraw tokens and return
-        Token::withdraw(&mut pair.coin0, amount0Out)
+        (reserve_in, reserve_out)
     }
 
-    // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
-    public fun get_amount_0_in<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(amount_1_out: u64): u64
+    // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
+    public fun get_amount_out<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, amount_in: u64): u64
         acquires Pair
     {
         // validation
-        assert!(amount_1_out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+        assert!(amount_in > 0, 1004); // INSUFFICIENT_INPUT_AMOUNT
 
         // get pair reserves
-        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
-        let reserve0 = Token::value(&pair.coin0);
-        let reserve1 = Token::value(&pair.coin1);
-        assert!(reserve0 > 0 && reserve1 > 0, 1005); // INSUFFICIENT_LIQUIDITY
+        let (reserve_in, reserve_out) = get_reserves<In, Out>(pool_owner);
+        assert!(reserve_in > 0 && reserve_out > 0, 1005); // INSUFFICIENT_LIQUIDITY
 
-        // calc amount in
-        let numerator = reserve0 * amount_1_out * 1000;
-        let denominator = reserve1 - (amount_1_out * 997);
-        (numerator / denominator) + 1
+        // calc amount out
+        let amount_in_with_fee = amount_in * 997;
+        let numerator = amount_in_with_fee * reserve_out;
+        let denominator = (reserve_in * 1000) + amount_in_with_fee;
+        numerator / denominator
     }
 
-    // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
-    public fun get_amount_1_in<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(amount_0_out: u64): u64
+    // given an output amount of an asset, returns a required input amount of the other asset
+    public fun get_amount_in<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, amount_out: u64): u64
         acquires Pair
     {
         // validation
-        assert!(amount_0_out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+        assert!(amount_out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
 
         // get pair reserves
-        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
-        let reserve0 = Token::value(&pair.coin0);
-        let reserve1 = Token::value(&pair.coin1);
-        assert!(reserve0 > 0 && reserve1 > 0, 1005); // INSUFFICIENT_LIQUIDITY
+        let (reserve_in, reserve_out) = get_reserves<In, Out>(pool_owner);
+        assert!(reserve_in > 0 && reserve_out > 0, 1005); // INSUFFICIENT_LIQUIDITY
 
         // calc amount in
-        let numerator = reserve1 * amount_0_out * 1000;
-        let denominator = reserve0 - (amount_0_out * 997);
+        let numerator = reserve_in * amount_out * 1000;
+        let denominator = reserve_out - (amount_out * 997);
         (numerator / denominator) + 1
     }
 
-    // finds the pair with the most liquidity (returns the pair with highest minimum reserve)
-    // returns true for pair 1 or false for pair 0
-    public fun maximin_reserves<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address): (bool, u64, u64)
-        acquires Pair
-    {
-        // make sure both pairs exist
-        assert!(exists<Pair<Asset0Type, Asset1Type>>(sender), 1006); // PAIR_0_DOES_NOT_EXIST
-        assert!(exists<Pair<Asset1Type, Asset0Type>>(sender), 1007); // PAIR_1_DOES_NOT_EXIST
-
-        // get pair reserves
-        let pair0 = borrow_global<Pair<Asset0Type, Asset1Type>>(pool_owner);
-        let pair0reserve0 = Token::value(&pair0.coin0);
-        let pair0reserve1 = Token::value(&pair0.coin1);
-        let pair1 = borrow_global<Pair<Asset1Type, Asset0Type>>(pool_owner);
-        let pair1reserve0 = Token::value(&pair1.coin0);
-        let pair1reserve1 = Token::value(&pair1.coin1);
-
-        // return pair with highest minimum
-        min(pair1reserve0, pair1reserve1) > min(pair0reserve0, pair0reserve1) ? (true, pair1reserve0, pair1reserve1) : (false, pair0reserve0, pair0reserve1)
+    // returns 1 if found Pair<Asset0Type, Asset1Type>, 2 if found Pair<Asset1Type, Asset0Type>, or 0 if pair does not exist
+    // for use with mint and burn functions--we must know the correct pair asset ordering
+    public fun find_pair<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(): u8 {
+        if (exists<Pair<Asset0Type, Asset1Type>>(pool_owner)) return 1;
+        if (exists<Pair<Asset1Type, Asset0Type>>(pool_owner)) return 2;
+        return 0;
     }
 }
 
