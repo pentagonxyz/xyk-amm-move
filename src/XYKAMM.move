@@ -191,40 +191,64 @@ module XYKAMM {
         *total_supply_ref = *total_supply_ref - burn_amount
     }
 
-    public fun swap<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0In: Token::Coin<Asset0Type>, coin1In: Token::Coin<Asset1Type>, amount0Out: u64, amount1Out: u64): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
+    // swap from asset 0 to asset 1 on a pair
+    public fun swap_0_to_1<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0In: Token::Coin<Asset0Type>): (Token::Coin<Asset1Type>)
         acquires Pair
     {
-        // input validation
-        assert!(amount0Out > 0 || amount1Out > 0, 1003); // INSUFFICIENT_OUTPUT_AMOUNT
-        
         // get pair reserves
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
         let reserve0 = Token::value(&pair.coin0);
         let reserve1 = Token::value(&pair.coin1);
-        
-        // more validation
-        assert!(amount0Out < reserve0 && amount1Out < reserve1, 1004); // INSUFFICIENT_LIQUIDITY
 
-        // get deposited amounts
+        // get deposited amount
         let amount0In = Token::value(&coin0);
-        let amount1In = Token::value(&coin1);
+        assert!(amount0In > 0, 1003); // INSUFFICIENT_INPUT_AMOUNT
+        
+        // get amount out based on XY=K invariant
+        let amountInWithFee = amount0In * 997;
+        let numerator = amountInWithFee * reserve1;
+        let denominator = (reserve0 * 1000) + amountInWithFee;
+        let amount1Out = numerator / denominator;
         
         // more validation
-        assert!(amount0In > 0 || amount1In > 0, 1005); // INSUFFICIENT_INPUT_AMOUNT
-        
-        // validate XY=K
-        let balance0 = reserve0 + amount0In - amount0Out;
-        let balance1 = reserve1 + amount1In - amount1Out;
-        let balance0Adjusted = balance0 * 1000 - (amount0In * 3);
-        let balance1Adjusted = balance1 * 1000 - (amount1In * 3);
-        assert!(balance0Adjusted * balance1Adjusted >= reserve0 * reserve1 * 1000000, 1006); // K
+        assert!(amount1Out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+        assert!(amount1Out < reserve1, 1005); // INSUFFICIENT_LIQUIDITY
         
         // deposit tokens
         Token::deposit(&mut pair.coin0, coin0In);
+
+        // withdraw tokens and return
+        Token::withdraw(&mut pair.coin1, amount1Out)
+    }
+
+    // swap from asset 1 to asset 0 on a pair
+    public fun swap_1_to_0<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin1In: Token::Coin<Asset1Type>): (Token::Coin<Asset0Type>)
+        acquires Pair
+    {
+        // get pair reserves
+        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
+        let reserve0 = Token::value(&pair.coin0);
+        let reserve1 = Token::value(&pair.coin1);
+
+        // get deposited amount
+        let amount1In = Token::value(&coin1);
+        assert!(amount1In > 0, 1003); // INSUFFICIENT_INPUT_AMOUNT
+        
+        // get amount out based on XY=K invariant
+        let amountInWithFee = amount1In * 997;
+        let numerator = amountInWithFee * reserve0;
+        let denominator = (reserve1 * 1000) + amountInWithFee;
+        let amount0Out = numerator / denominator;
+        
+        // more validation
+        assert!(amount0Out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+        assert!(amount0Out < reserve0, 1005); // INSUFFICIENT_LIQUIDITY
+        
+        // deposit tokens
         Token::deposit(&mut pair.coin1, coin1In);
 
         // withdraw tokens and return
-        (Token::withdraw(&mut pair.coin0, amount0Out), Token::withdraw(&mut pair.coin1, amount1Out))
+        Token::withdraw(&mut pair.coin0, amount0Out)
     }
 }
 
