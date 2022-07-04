@@ -239,6 +239,14 @@ module XYKAMM {
         }
     }
 
+    public fun swap_to<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, &mut coin_in: Token::Coin<In>, amount_out: u64): (Token::Coin<Out>)
+        acquires Pair
+    {
+        let amount_in = get_amount_in<In, Out>(pool_owner, amount_out);
+        let coin_in_swap = Token::withdraw(&mut coin_in, amount_in);
+        swap<In, Out>(pool_owner, &mut coin_in_swap, 0)
+    }
+
     fun get_reserves<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address): (u64, u64)
         acquires Pair
     {
