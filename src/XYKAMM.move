@@ -93,7 +93,7 @@ module XYKAMM {
     }
 
     fun min(x: u64, y: u64): u64 {
-        x < y ? x : y
+        if (x < y) x else y
     }
     
     // babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
