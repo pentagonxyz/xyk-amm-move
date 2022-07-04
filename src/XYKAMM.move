@@ -194,7 +194,7 @@ module XYKAMM {
         *total_supply_ref = *total_supply_ref - burn_amount
     }
 
-    public fun swap<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: Token::Coin<In>): (Token::Coin<Out>)
+    public fun swap<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: Token::Coin<In>, amount_out_min: u64): (Token::Coin<Out>)
         acquires Pair
     {
         // get pair reserves
@@ -226,7 +226,7 @@ module XYKAMM {
         let amount_out = numerator / denominator;
         
         // more validation
-        assert!(amount_out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+        assert!(amount_out > 0 && amount_out >= amount_out_min, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
         assert!(amount_out < reserve_out, 1005); // INSUFFICIENT_LIQUIDITY
         
         // deposit input token, withdraw output tokens, and return them
