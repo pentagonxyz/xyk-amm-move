@@ -144,7 +144,7 @@ module XYKAMM {
         mint_liquidity<Asset0Type, Asset1Type>(pool_owner, liquidity);
     }
 
-    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(&mut liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
+    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
         acquires Pair
     {
         // get pair reserves
