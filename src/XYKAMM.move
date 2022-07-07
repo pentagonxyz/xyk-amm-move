@@ -1,24 +1,5 @@
 address 0x2 {
 
-module Map {
-    native struct T<K, V> has copy, drop, store;
-
-    native public fun empty<K, V>(): T<K, V>;
-
-    native public fun get<K, V>(m: &T<K, V>, k: &K): &V;
-    native public fun get_mut<K, V>(m: &mut T<K, V>, k: &K): &mut V;
-
-    native public fun contains_key<K, V>(m: &T<K, V>, k: &K): bool;
-    // throws on duplicate as I don't feel like mocking up Option
-    native public fun insert<K, V>(m: &T<K, V>, k: K, v: V);
-    // throws on miss as I don't feel like mocking up Option
-    native public fun remove<K, V>(m: &T<K, V>, k: &K): V;
-}
-
-}
-
-address 0x2 {
-
 module Token {
 
     struct Coin<AssetType: copy + drop> has store {
@@ -70,7 +51,6 @@ address 0x4 {
 
 module XYKAMM {
     use Std::Signer;
-    use 0x2::Map;
     use 0x2::Token;
     
     const MINIMUM_LIQUIDITY: u64 = 1000;
