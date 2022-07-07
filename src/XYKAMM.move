@@ -85,7 +85,7 @@ module XYKAMM {
         pool_owner: address
     }
 
-    fun accept<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, init0: Token::Coin<Asset0Type>, init1: Token::Coin<Asset1Type>) {
+    public fun accept<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, init0: Token::Coin<Asset0Type>, init1: Token::Coin<Asset1Type>) {
         let sender = Signer::address_of(account);
         assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
         assert!(!exists<Pair<Asset1Type, Asset0Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
