@@ -77,7 +77,7 @@ module Pentagon::XYKAMM {
             while (x < z) {
                 z = x;
                 x = (y / x + x) / 2;
-            }
+            };
             return z;
         } else if (y != 0) {
             return 1;
@@ -105,7 +105,7 @@ module Pentagon::XYKAMM {
             increase_total_supply_record<Asset0Type, Asset1Type>(pool_owner, MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
             liquidity = min(amount0 * pair.totalSupply / reserve0, amount1 * pair.totalSupply / reserve1);
-        }
+        };
 
         assert!(liquidity > 0, 1001); // INSUFFICIENT_LIQUIDITY_MINTED
         
@@ -117,7 +117,7 @@ module Pentagon::XYKAMM {
         mint_liquidity<Asset0Type, Asset1Type>(pool_owner, liquidity);
     }
 
-    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
+    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
         acquires Pair
     {
         // get pair reserves
@@ -186,7 +186,7 @@ module Pentagon::XYKAMM {
             pair = borrow_global_mut<Pair<Out, In>>(pool_owner);
             reserve_in = Token::value(&pair.coin1);
             reserve_out = Token::value(&pair.coin0);
-        }
+        };
 
         // get deposited amount
         let amount_in = Token::value(&coin_in);
@@ -212,7 +212,7 @@ module Pentagon::XYKAMM {
         }
     }
 
-    public fun swap_to<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, &mut coin_in: Token::Coin<In>, amount_out: u64): Token::Coin<Out>
+    public fun swap_to<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: &mut Token::Coin<In>, amount_out: u64): Token::Coin<Out>
         acquires Pair
     {
         let amount_in = get_amount_in<In, Out>(pool_owner, amount_out);
@@ -235,7 +235,7 @@ module Pentagon::XYKAMM {
             let pair = borrow_global_mut<Pair<Out, In>>(pool_owner);
             reserve_in = Token::value(&pair.coin1);
             reserve_out = Token::value(&pair.coin0);
-        }
+        };
 
         (reserve_in, reserve_out)
     }
