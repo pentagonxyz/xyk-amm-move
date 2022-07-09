@@ -150,7 +150,6 @@ module Pentagon::XYKAMM {
         acquires Pair
     {
         decrease_total_supply_record<Asset0Type, Asset1Type>(liquidity.type.pool_owner, Token::value(&liquidity));
-        Token::destroy_zero(&mut liquidity);
     }
 
     fun increase_total_supply_record<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, mint_amount: u64)
