@@ -212,7 +212,7 @@ module Pentagon::XYKAMM {
         }
     }
 
-    public fun swap_to<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, &mut coin_in: Token::Coin<In>, amount_out: u64): (Token::Coin<Out>)
+    public fun swap_to<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, &mut coin_in: Token::Coin<In>, amount_out: u64): Token::Coin<Out>
         acquires Pair
     {
         let amount_in = get_amount_in<In, Out>(pool_owner, amount_out);
