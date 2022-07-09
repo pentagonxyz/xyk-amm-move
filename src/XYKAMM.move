@@ -1,7 +1,4 @@
-address 0x2 {
-
-module Token {
-
+module Pentagon::Token {
     struct Coin<AssetType: copy + drop> has store {
         type: AssetType,
         value: u64,
@@ -42,16 +39,12 @@ module Token {
         let Coin { value, type: _ } = coin;
         assert!(value == 0, 11)
     }
-
 }
 
-}
-
-address 0x4 {
-
-module XYKAMM {
+module Pentagon::XYKAMM {
     use Std::Signer;
-    use 0x2::Token;
+
+    use Pentagon::Token;
     
     const MINIMUM_LIQUIDITY: u64 = 1000;
 
@@ -289,6 +282,4 @@ module XYKAMM {
         if (exists<Pair<Asset1Type, Asset0Type>>(pool_owner)) return 2;
         return 0;
     }
-}
-
 }
