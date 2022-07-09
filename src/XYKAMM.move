@@ -216,7 +216,7 @@ module Pentagon::XYKAMM {
     {
         let amount_in = get_amount_in<In, Out>(pool_owner, amount_out);
         let coin_in_swap = Token::withdraw(&mut coin_in, amount_in);
-        swap<In, Out>(pool_owner, &mut coin_in_swap, 0)
+        swap<In, Out>(pool_owner, &mut coin_in_swap, amount_out)
     }
 
     fun get_reserves<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address): (u64, u64)
