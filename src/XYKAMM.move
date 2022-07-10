@@ -51,10 +51,10 @@ module Pentagon::XYKAMM {
     struct Pair<Asset0Type: copy + drop, Asset1Type: copy + drop> has key {
         coin0: Token::Coin<Asset0Type>,
         coin1: Token::Coin<Asset1Type>,
-        totalSupply: u64
+        total_supply: u64
     }
 
-    struct LiquidityAssetType<phantom Asset0Type: copy + drop, phantom Asset1Type: copy + drop> has copy, drop, store {
+    struct LiquidityAsset<phantom Asset0Type: copy + drop, phantom Asset1Type: copy + drop> has copy, drop, store {
         pool_owner: address
     }
 
@@ -62,7 +62,7 @@ module Pentagon::XYKAMM {
         let sender = Signer::address_of(account);
         assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
         assert!(!exists<Pair<Asset1Type, Asset0Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
-        move_to(account, Pair<Asset0Type, Asset1Type> { coin0: init0, coin1: init1, totalSupply: 0 })
+        move_to(account, Pair<Asset0Type, Asset1Type> { coin0: init0, coin1: init1, total_supply: 0 })
     }
 
     fun min(x: u64, y: u64): u64 {
@@ -83,7 +83,7 @@ module Pentagon::XYKAMM {
         if (y > 0) 1 else 0
     }
 
-    public fun mint<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>): Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>
+    public fun mint<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>): Token::Coin<LiquidityAsset<Asset0Type, Asset1Type>>
         acquires Pair
     {
         // get pair reserves
@@ -99,12 +99,14 @@ module Pentagon::XYKAMM {
         // calc liquidity to mint from deposited amounts
         let liquidity;
 
-        if (pair.totalSupply == 0) {
+        if (pair.total_supply == 0) {
             liquidity = sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
-            let total_supply_ref = &mut pair.totalSupply;
-            *total_supply_ref = *total_supply_ref + MINIMUM_LIQUIDITY; // permanently lock the first MINIMUM_LIQUIDITY tokens
+
+            // permanently lock the first MINIMUM_LIQUIDITY tokens
+            let total_supply_ref = &mut pair.total_supply;
+            *total_supply_ref = *total_supply_ref + MINIMUM_LIQUIDITY;
         } else {
-            liquidity = min(amount0 * pair.totalSupply / reserve0, amount1 * pair.totalSupply / reserve1);
+            liquidity = min(amount0 * pair.total_supply / reserve0, amount1 * pair.total_supply / reserve1);
         };
 
         assert!(liquidity > 0, 1001); // INSUFFICIENT_LIQUIDITY_MINTED
@@ -114,12 +116,12 @@ module Pentagon::XYKAMM {
         Token::deposit(&mut pair.coin1, coin1);
         
         // mint liquidity and return it
-        let total_supply_ref = &mut pair.totalSupply;
+        let total_supply_ref = &mut pair.total_supply;
         *total_supply_ref = *total_supply_ref + liquidity;
-        Token::create<LiquidityAssetType<Asset0Type, Asset1Type>>(LiquidityAssetType<Asset0Type, Asset1Type> { pool_owner }, liquidity)
+        Token::create<LiquidityAsset<Asset0Type, Asset1Type>>(LiquidityAsset<Asset0Type, Asset1Type> { pool_owner }, liquidity)
     }
 
-    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
+    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, liquidity: Token::Coin<LiquidityAsset<Asset0Type, Asset1Type>>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
         acquires Pair
     {
         // get pair reserves
@@ -130,12 +132,12 @@ module Pentagon::XYKAMM {
         
         // get amounts to withdraw from burnt liquidity
         let liquidity_value = Token::value(&liquidity);
-        let amount0 = liquidity_value * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
-        let amount1 = liquidity_value * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
+        let amount0 = liquidity_value * reserve0 / pair.total_supply; // using balances ensures pro-rata distribution
+        let amount1 = liquidity_value * reserve1 / pair.total_supply; // using balances ensures pro-rata distribution
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
-        let total_supply_ref = &mut pair.totalSupply;
+        let total_supply_ref = &mut pair.total_supply;
         *total_supply_ref = *total_supply_ref - liquidity_value;
         
         // withdraw tokens and return
