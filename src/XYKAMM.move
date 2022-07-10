@@ -238,4 +238,81 @@ module Aubrium::XYKAMM {
         if (exists<Pair<Asset1Type, Asset0Type>>(@Aubrium)) return 2;
         0
     }
+
+    #[test_only]
+    struct FakeMoneyA { }
+
+    #[test_only]
+    struct FakeMoneyB { }
+
+    #[test_only]
+    struct FakeMoneyCapabilities<phantom FakeMoneyType> has key {
+        mint_cap: MintCapability<FakeMoneyType>,
+        burn_cap: BurnCapability<FakeMoneyType>,
+    }
+
+    #[test(root = @Aubrium, coin_creator = @0x1000)]
+    public(script) fun end_to_end(
+        root: signer,
+        coin_creator: signer
+    ) acquires Pair {
+        // init 2 fake coins
+        let (mint_cap_a, burn_cap_a) = Coin::initialize<FakeMoneyA>(
+            &coin_creator,
+            ASCII::string(b"Fake Money A"),
+            ASCII::string(b"FMA"),
+            6,
+            true
+        );
+
+        let (mint_cap_b, burn_cap_b) = Coin::initialize<FakeMoneyB>(
+            &coin_creator,
+            ASCII::string(b"Fake Money B"),
+            ASCII::string(b"FMB"),
+            6,
+            true
+        );
+
+        // mint liquidity
+        let coin0 = Coin::mint<FakeMoneyA>(50000000, &mint_cap_a);
+        let coin1 = Coin::mint<FakeMoneyB>(100000000, &mint_cap_b);
+        let liquidity = mint<FakeMoneyA, FakeMoneyB>(coin0, coin1);
+        assert!(Coin::value(&liquidity) == 70709678, 1000);
+
+        // mint more liquidity
+        let coin0 = Coin::mint<FakeMoneyA>(50000000, &mint_cap_a);
+        let coin1 = Coin::mint<FakeMoneyB>(100000000, &mint_cap_b);
+        let liquidity2 = mint<FakeMoneyA, FakeMoneyB>(coin0, coin1);
+        assert!(Coin::value(&liquidity2) == 70710678, 1000);
+
+        // swap A to B
+        let coin0_in = Coin::mint<FakeMoneyA>(10000000, &mint_cap_a);
+        let coin1_out = swap<FakeMoneyA, FakeMoneyB>(coin0_in, 0);
+        assert!(Coin::value(&coin1_out) == 18132217, 1000);
+
+        // swap B to A
+        let coin0_out = swap<FakeMoneyB, FakeMoneyA>(coin1_out, 0);
+        assert!(Coin::value(&coin0_out) == 9945506, 1000);
+
+        // merge and burn liquidity
+        Coin::merge(&mut liquidity, liquidity2);
+        let (coin0_from_burning, coin1_from_burning) = burn<FakeMoneyA, FakeMoneyB>(liquidity);
+        assert!(Coin::value(&coin0_from_burning) == 100053786, 1000); // 100054494 * ((70709678 + 70710678) / (70710678 * 2))
+        assert!(Coin::value(&coin1_from_burning) == 200000000, 1000);
+
+        // clean up: we can't drop coins so we burn them
+        Coin::burn(coin0_out, &burn_cap_a);
+        Coin::burn(coin0_from_burning, &burn_cap_a);
+        Coin::burn(coin1_from_burning, &burn_cap_b);
+
+        // clean up: we can't drop mint/burn caps so we store them
+        move_to(&coin_creator, FakeMoneyCapabilities<FakeMoneyA>{
+            mint_cap: mint_cap_a,
+            burn_cap: burn_cap_a,
+        });
+        move_to(&coin_creator, FakeMoneyCapabilities<FakeMoneyB>{
+            mint_cap: mint_cap_b,
+            burn_cap: burn_cap_b,
+        });
+    }
 }
