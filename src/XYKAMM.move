@@ -79,9 +79,8 @@ module Pentagon::XYKAMM {
                 x = (y / x + x) / 2;
             };
             return z;
-        } else if (y != 0) {
-            return 1;
-        }
+        };
+        if (y > 0) 1 else 0
     }
 
     public fun mint<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>): Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>
@@ -102,7 +101,8 @@ module Pentagon::XYKAMM {
 
         if (pair.totalSupply == 0) {
             liquidity = sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
-            increase_total_supply_record<Asset0Type, Asset1Type>(pool_owner, MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
+            let total_supply_ref = &mut pair.totalSupply;
+            *total_supply_ref = *total_supply_ref + MINIMUM_LIQUIDITY; // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
             liquidity = min(amount0 * pair.totalSupply / reserve0, amount1 * pair.totalSupply / reserve1);
         };
@@ -114,7 +114,9 @@ module Pentagon::XYKAMM {
         Token::deposit(&mut pair.coin1, coin1);
         
         // mint liquidity and return it
-        mint_liquidity<Asset0Type, Asset1Type>(pool_owner, liquidity);
+        let total_supply_ref = &mut pair.totalSupply;
+        *total_supply_ref = *total_supply_ref + liquidity;
+        Token::create(LiquidityAssetType<Asset0Type, Asset1Type>{pool_owner}, liquidity)
     }
 
     public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
@@ -133,37 +135,11 @@ module Pentagon::XYKAMM {
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
-        burn_liquidity<Asset0Type, Asset1Type>(&mut liquidity);
+        let total_supply_ref = &mut pair.totalSupply;
+        *total_supply_ref = *total_supply_ref - liquidity_value;
         
         // withdraw tokens and return
         (Token::withdraw(&mut pair.coin0, amount0), Token::withdraw(&mut pair.coin1, amount1))
-    }
-    
-    fun mint_liquidity<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, amount: u64): Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>
-        acquires Pair
-    {
-        increase_total_supply_record<Asset0Type, Asset1Type>(pool_owner, amount);
-        Token::create(LiquidityAssetType<Asset0Type, Asset1Type>{pool_owner}, amount)
-    }
-    
-    fun burn_liquidity<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>)
-        acquires Pair
-    {
-        decrease_total_supply_record<Asset0Type, Asset1Type>(liquidity.type.pool_owner, Token::value(&liquidity));
-    }
-
-    fun increase_total_supply_record<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, mint_amount: u64)
-        acquires Pair
-    {
-        let total_supply_ref = &mut borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner).totalSupply;
-        *total_supply_ref = *total_supply_ref + mint_amount
-    }
-
-    fun decrease_total_supply_record<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, burn_amount: u64)
-        acquires Pair
-    {
-        let total_supply_ref = &mut borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner).totalSupply;
-        *total_supply_ref = *total_supply_ref - burn_amount
     }
 
     public fun swap<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: Token::Coin<In>, amount_out_min: u64): (Token::Coin<Out>)
@@ -279,6 +255,6 @@ module Pentagon::XYKAMM {
     public fun find_pair<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(): u8 {
         if (exists<Pair<Asset0Type, Asset1Type>>(pool_owner)) return 1;
         if (exists<Pair<Asset1Type, Asset0Type>>(pool_owner)) return 2;
-        return 0;
+        0
     }
 }
