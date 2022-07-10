@@ -51,18 +51,27 @@ module Pentagon::XYKAMM {
     struct Pair<Asset0Type: copy + drop, Asset1Type: copy + drop> has key {
         coin0: Token::Coin<Asset0Type>,
         coin1: Token::Coin<Asset1Type>,
-        total_supply: u64
+        total_supply: u64,
+        burnt_liquidity: Token::Coin<LiquidityAsset<Asset0Type, Asset1Type>>
     }
 
     struct LiquidityAsset<phantom Asset0Type: copy + drop, phantom Asset1Type: copy + drop> has copy, drop, store {
         pool_owner: address
     }
 
-    public fun accept<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, init0: Token::Coin<Asset0Type>, init1: Token::Coin<Asset1Type>) {
-        let sender = Signer::address_of(account);
-        assert!(!exists<Pair<Asset0Type, Asset1Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
-        assert!(!exists<Pair<Asset1Type, Asset0Type>>(sender), 1000); // PAIR_ALREADY_EXISTS
-        move_to(account, Pair<Asset0Type, Asset1Type> { coin0: init0, coin1: init1, total_supply: 0 })
+    public fun accept<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: &signer, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>) {
+        // make sure pair does not exist already
+        let pool_owner_address = Signer::address_of(pool_owner);
+        assert!(!exists<Pair<Asset0Type, Asset1Type>>(pool_owner_address), 1000); // PAIR_ALREADY_EXISTS
+        assert!(!exists<Pair<Asset1Type, Asset0Type>>(pool_owner_address), 1000); // PAIR_ALREADY_EXISTS
+
+        // create and store new pair
+        move_to(pool_owner, Pair<Asset0Type, Asset1Type> {
+            coin0,
+            coin1,
+            total_supply: 0,
+            burnt_liquidity: Token::create<LiquidityAsset<Asset0Type, Asset1Type>>(LiquidityAsset<Asset0Type, Asset1Type> { pool_owner: pool_owner_address }, 0)
+        })
     }
 
     fun min(x: u64, y: u64): u64 {
@@ -137,6 +146,7 @@ module Pentagon::XYKAMM {
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
+        Token::deposit(&mut pair.burnt_liquidity, liquidity);
         let total_supply_ref = &mut pair.total_supply;
         *total_supply_ref = *total_supply_ref - liquidity_value;
         
