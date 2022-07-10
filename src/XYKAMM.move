@@ -145,45 +145,45 @@ module Pentagon::XYKAMM {
     public fun swap<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: Token::Coin<In>, amount_out_min: u64): (Token::Coin<Out>)
         acquires Pair
     {
-        // get pair reserves
-        let reverse_pair = false;
-        let pair;
-        let reserve_in;
-        let reserve_out;
-
-        if (exists<Pair<In, Out>>(pool_owner)) {
-            pair = borrow_global_mut<Pair<In, Out>>(pool_owner);
-            reserve_in = Token::value(&pair.coin0);
-            reserve_out = Token::value(&pair.coin1);
-        } else {
-            assert!(exists<Pair<Out, In>>(pool_owner), 1006); // PAIR_DOES_NOT_EXIST
-            reverse_pair = true;
-            pair = borrow_global_mut<Pair<Out, In>>(pool_owner);
-            reserve_in = Token::value(&pair.coin1);
-            reserve_out = Token::value(&pair.coin0);
-        };
-
-        // get deposited amount
+        // get amount in
         let amount_in = Token::value(&coin_in);
-        assert!(amount_in > 0, 1003); // INSUFFICIENT_INPUT_AMOUNT
+
+        // get amount out + deposit + withdraw
+        if (exists<Pair<In, Out>>(pool_owner)) {
+            // get pair reserves
+            let pair = borrow_global_mut<Pair<In, Out>>(pool_owner);
+            let reserve_in = Token::value(&pair.coin0);
+            let reserve_out = Token::value(&pair.coin1);
+
+            // get amount out
+            let amount_out = get_amount_out_internal(reserve_in, reserve_out, amount_in);
+
+            // validation
+            assert!(amount_out > 0 && amount_out >= amount_out_min, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+            assert!(amount_out < reserve_out, 1005); // INSUFFICIENT_LIQUIDITY
         
-        // get amount out based on XY=K invariant
-        let amount_in_with_fee = amount_in * 997;
-        let numerator = amount_in_with_fee * reserve_out;
-        let denominator = (reserve_in * 1000) + amount_in_with_fee;
-        let amount_out = numerator / denominator;
-        
-        // more validation
-        assert!(amount_out > 0 && amount_out >= amount_out_min, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
-        assert!(amount_out < reserve_out, 1005); // INSUFFICIENT_LIQUIDITY
-        
-        // deposit input token, withdraw output tokens, and return them
-        if (reverse_pair) {
-            Token::deposit(&mut pair.coin1, coin_in);
-            return Token::withdraw(&mut pair.coin0, amount_out);
-        } else {
+            // deposit input token, withdraw output tokens, and return them
             Token::deposit(&mut pair.coin0, coin_in);
-            return Token::withdraw(&mut pair.coin1, amount_out);
+            Token::withdraw(&mut pair.coin1, amount_out)
+        } else {
+            // assert pair exists
+            assert!(exists<Pair<Out, In>>(pool_owner), 1006); // PAIR_DOES_NOT_EXIST
+
+            // get pair reserves
+            let pair = borrow_global_mut<Pair<Out, In>>(pool_owner);
+            let reserve_in = Token::value(&pair.coin1);
+            let reserve_out = Token::value(&pair.coin0);
+
+            // get amount out
+            let amount_out = get_amount_out_internal(reserve_in, reserve_out, amount_in);
+
+            // validation
+            assert!(amount_out > 0 && amount_out >= amount_out_min, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+            assert!(amount_out < reserve_out, 1005); // INSUFFICIENT_LIQUIDITY
+
+            // deposit input token, withdraw output tokens, and return them
+            Token::deposit(&mut pair.coin1, coin_in);
+            Token::withdraw(&mut pair.coin0, amount_out)
         }
     }
 
@@ -216,14 +216,9 @@ module Pentagon::XYKAMM {
     }
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
-    public fun get_amount_out<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, amount_in: u64): u64
-        acquires Pair
-    {
+    fun get_amount_out_internal(reserve_in: u64, reserve_out: u64, amount_in: u64): u64 {
         // validation
         assert!(amount_in > 0, 1004); // INSUFFICIENT_INPUT_AMOUNT
-
-        // get pair reserves
-        let (reserve_in, reserve_out) = get_reserves<In, Out>(pool_owner);
         assert!(reserve_in > 0 && reserve_out > 0, 1005); // INSUFFICIENT_LIQUIDITY
 
         // calc amount out
@@ -231,6 +226,17 @@ module Pentagon::XYKAMM {
         let numerator = amount_in_with_fee * reserve_out;
         let denominator = (reserve_in * 1000) + amount_in_with_fee;
         numerator / denominator
+    }
+
+    // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
+    public fun get_amount_out<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, amount_in: u64): u64
+        acquires Pair
+    {
+        // get pair reserves
+        let (reserve_in, reserve_out) = get_reserves<In, Out>(pool_owner);
+
+        // return amount out
+        get_amount_out_internal(reserve_in, reserve_out, amount_in)
     }
 
     // given an output amount of an asset, returns a required input amount of the other asset
