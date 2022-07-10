@@ -1,4 +1,4 @@
-module Pentagon::Token {
+module 0x2::Token {
     struct Coin<AssetType: copy + drop> has store {
         type: AssetType,
         value: u64,
@@ -44,7 +44,7 @@ module Pentagon::Token {
 module Pentagon::XYKAMM {
     use Std::Signer;
 
-    use Pentagon::Token;
+    use 0x2::Token;
     
     const MINIMUM_LIQUIDITY: u64 = 1000;
 
