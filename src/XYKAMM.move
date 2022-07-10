@@ -78,12 +78,12 @@ module Pentagon::XYKAMM {
                 z = x;
                 x = (y / x + x) / 2;
             };
-            return z;
+            return z
         };
         if (y > 0) 1 else 0
     }
 
-    public fun mint<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(account: &signer, pool_owner: address, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>): Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>
+    public fun mint<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, coin0: Token::Coin<Asset0Type>, coin1: Token::Coin<Asset1Type>): Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>
         acquires Pair
     {
         // get pair reserves
@@ -97,7 +97,7 @@ module Pentagon::XYKAMM {
         let amount1 = Token::value(&coin1);
         
         // calc liquidity to mint from deposited amounts
-        let liquidity = 0;
+        let liquidity;
 
         if (pair.totalSupply == 0) {
             liquidity = sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
@@ -116,22 +116,22 @@ module Pentagon::XYKAMM {
         // mint liquidity and return it
         let total_supply_ref = &mut pair.totalSupply;
         *total_supply_ref = *total_supply_ref + liquidity;
-        Token::create(LiquidityAssetType<Asset0Type, Asset1Type>{pool_owner}, liquidity)
+        Token::create<LiquidityAssetType<Asset0Type, Asset1Type>>(LiquidityAssetType<Asset0Type, Asset1Type> { pool_owner }, liquidity)
     }
 
-    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
+    public fun burn<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address, liquidity: Token::Coin<LiquidityAssetType<Asset0Type, Asset1Type>>): (Token::Coin<Asset0Type>, Token::Coin<Asset1Type>)
         acquires Pair
     {
         // get pair reserves
-        assert!(exists<Pair<Asset0Type, Asset1Type>>(liquidity.type.pool_owner), 1006); // PAIR_DOES_NOT_EXIST
-        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(liquidity.type.pool_owner);
+        assert!(exists<Pair<Asset0Type, Asset1Type>>(pool_owner), 1006); // PAIR_DOES_NOT_EXIST
+        let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(pool_owner);
         let reserve0 = Token::value(&pair.coin0);
         let reserve1 = Token::value(&pair.coin1);
         
         // get amounts to withdraw from burnt liquidity
         let liquidity_value = Token::value(&liquidity);
-        amount0 = liquidity_value * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
-        amount1 = liquidity_value * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
+        let amount0 = liquidity_value * reserve0 / pair.totalSupply; // using balances ensures pro-rata distribution
+        let amount1 = liquidity_value * reserve1 / pair.totalSupply; // using balances ensures pro-rata distribution
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
@@ -142,7 +142,7 @@ module Pentagon::XYKAMM {
         (Token::withdraw(&mut pair.coin0, amount0), Token::withdraw(&mut pair.coin1, amount1))
     }
 
-    public fun swap<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: Token::Coin<In>, amount_out_min: u64): (Token::Coin<Out>)
+    public fun swap<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address, coin_in: Token::Coin<In>, amount_out_min: u64): Token::Coin<Out>
         acquires Pair
     {
         // get amount in
@@ -191,8 +191,8 @@ module Pentagon::XYKAMM {
         acquires Pair
     {
         let amount_in = get_amount_in<In, Out>(pool_owner, amount_out);
-        let coin_in_swap = Token::withdraw(&mut coin_in, amount_in);
-        swap<In, Out>(pool_owner, &mut coin_in_swap, amount_out)
+        let coin_in_swap = Token::withdraw(coin_in, amount_in);
+        swap<In, Out>(pool_owner, coin_in_swap, amount_out)
     }
 
     fun get_reserves<In: copy + drop + store, Out: copy + drop + store>(pool_owner: address): (u64, u64)
@@ -258,7 +258,7 @@ module Pentagon::XYKAMM {
 
     // returns 1 if found Pair<Asset0Type, Asset1Type>, 2 if found Pair<Asset1Type, Asset0Type>, or 0 if pair does not exist
     // for use with mint and burn functions--we must know the correct pair asset ordering
-    public fun find_pair<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(): u8 {
+    public fun find_pair<Asset0Type: copy + drop + store, Asset1Type: copy + drop + store>(pool_owner: address): u8 {
         if (exists<Pair<Asset0Type, Asset1Type>>(pool_owner)) return 1;
         if (exists<Pair<Asset1Type, Asset0Type>>(pool_owner)) return 2;
         0
