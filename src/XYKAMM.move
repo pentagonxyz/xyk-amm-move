@@ -41,7 +41,7 @@ module 0x2::Token {
     }
 }
 
-module Pentagon::XYKAMM {
+module Aubrium::XYKAMM {
     use Std::Signer;
 
     use 0x2::Token;
