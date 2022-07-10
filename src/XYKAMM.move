@@ -14,7 +14,7 @@ module Aubrium::XYKAMM {
         locked_liquidity: Coin<LiquidityCoin<Asset0Type, Asset1Type>>
     }
 
-    struct LiquidityCoin<phantom Asset0Type, phantom Asset1Type> has key { }
+    struct LiquidityCoin<phantom Asset0Type, phantom Asset1Type> { }
 
     public fun accept<Asset0Type, Asset1Type>(root: &signer) {
         // make sure pair does not exist already
