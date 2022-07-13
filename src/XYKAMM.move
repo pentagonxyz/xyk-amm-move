@@ -59,9 +59,7 @@ module Aubrium::XYKAMM {
         if (y > 0) 1 else 0
     }
 
-    public fun mint<Asset0Type, Asset1Type>(coin0: Coin<Asset0Type>, coin1: Coin<Asset1Type>): Coin<LiquidityCoin<Asset0Type, Asset1Type>>
-        acquires Pair
-    {
+    public fun mint<Asset0Type, Asset1Type>(coin0: Coin<Asset0Type>, coin1: Coin<Asset1Type>): Coin<LiquidityCoin<Asset0Type, Asset1Type>> acquires Pair {
         // get pair reserves
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(@Aubrium);
@@ -94,9 +92,7 @@ module Aubrium::XYKAMM {
         Coin::mint<LiquidityCoin<Asset0Type, Asset1Type>>(liquidity, &pair.mint_capability)
     }
 
-    public fun burn<Asset0Type, Asset1Type>(liquidity: Coin<LiquidityCoin<Asset0Type, Asset1Type>>): (Coin<Asset0Type>, Coin<Asset1Type>)
-        acquires Pair
-    {
+    public fun burn<Asset0Type, Asset1Type>(liquidity: Coin<LiquidityCoin<Asset0Type, Asset1Type>>): (Coin<Asset0Type>, Coin<Asset1Type>) acquires Pair {
         // get pair reserves
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(@Aubrium);
@@ -117,9 +113,7 @@ module Aubrium::XYKAMM {
         (Coin::extract(&mut pair.coin0, amount0), Coin::extract(&mut pair.coin1, amount1))
     }
 
-    public fun swap<In, Out>(coin_in: Coin<In>, amount_out_min: u64): Coin<Out>
-        acquires Pair
-    {
+    public fun swap<In, Out>(coin_in: Coin<In>, amount_out_min: u64): Coin<Out> acquires Pair {
         // get amount in
         let amount_in = Coin::value(&coin_in);
 
@@ -162,17 +156,13 @@ module Aubrium::XYKAMM {
         }
     }
 
-    public fun swap_to<In, Out>(coin_in: &mut Coin<In>, amount_out: u64): Coin<Out>
-        acquires Pair
-    {
+    public fun swap_to<In, Out>(coin_in: &mut Coin<In>, amount_out: u64): Coin<Out> acquires Pair {
         let amount_in = get_amount_in<In, Out>(amount_out);
         let coin_in_swap = Coin::extract(coin_in, amount_in);
         swap<In, Out>(coin_in_swap, amount_out)
     }
 
-    fun get_reserves<In, Out>(): (u64, u64)
-        acquires Pair
-    {
+    public fun get_reserves<In, Out>(): (u64, u64) acquires Pair {
         let reserve_in;
         let reserve_out;
 
@@ -204,9 +194,7 @@ module Aubrium::XYKAMM {
     }
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
-    public fun get_amount_out<In, Out>(amount_in: u64): u64
-        acquires Pair
-    {
+    public fun get_amount_out<In, Out>(amount_in: u64): u64 acquires Pair {
         // get pair reserves
         let (reserve_in, reserve_out) = get_reserves<In, Out>();
 
@@ -215,9 +203,7 @@ module Aubrium::XYKAMM {
     }
 
     // given an output amount of an asset, returns a required input amount of the other asset
-    public fun get_amount_in<In, Out>(amount_out: u64): u64
-        acquires Pair
-    {
+    public fun get_amount_in<In, Out>(amount_out: u64): u64 acquires Pair {
         // validation
         assert!(amount_out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
 
@@ -252,10 +238,7 @@ module Aubrium::XYKAMM {
     }
 
     #[test(root = @Aubrium, coin_creator = @0x1000)]
-    public(script) fun end_to_end(
-        root: signer,
-        coin_creator: signer
-    ) acquires Pair {
+    public(script) fun end_to_end(root: signer, coin_creator: signer) acquires Pair {
         // init 2 fake coins
         let (mint_cap_a, burn_cap_a) = Coin::initialize<FakeMoneyA>(
             &coin_creator,
@@ -276,13 +259,13 @@ module Aubrium::XYKAMM {
         // mint liquidity
         let coin0 = Coin::mint<FakeMoneyA>(50000000, &mint_cap_a);
         let coin1 = Coin::mint<FakeMoneyB>(100000000, &mint_cap_b);
-        let liquidity = mint<FakeMoneyA, FakeMoneyB>(coin0, coin1);
+        let liquidity = mint(coin0, coin1);
         assert!(Coin::value(&liquidity) == 70709678, 1000);
 
         // mint more liquidity
         let coin0 = Coin::mint<FakeMoneyA>(50000000, &mint_cap_a);
         let coin1 = Coin::mint<FakeMoneyB>(100000000, &mint_cap_b);
-        let liquidity2 = mint<FakeMoneyA, FakeMoneyB>(coin0, coin1);
+        let liquidity2 = mint(coin0, coin1);
         assert!(Coin::value(&liquidity2) == 70710678, 1000);
 
         // swap A to B
@@ -296,7 +279,7 @@ module Aubrium::XYKAMM {
 
         // merge and burn liquidity
         Coin::merge(&mut liquidity, liquidity2);
-        let (coin0_from_burning, coin1_from_burning) = burn<FakeMoneyA, FakeMoneyB>(liquidity);
+        let (coin0_from_burning, coin1_from_burning) = burn(liquidity);
         assert!(Coin::value(&coin0_from_burning) == 100053786, 1000); // 100054494 * ((70709678 + 70710678) / (70710678 * 2))
         assert!(Coin::value(&coin1_from_burning) == 200000000, 1000);
 
