@@ -1,6 +1,7 @@
 module Aubrium::XYKAMM {
     use Std::ASCII;
     use Std::Option;
+    use Std::Signer;
 
     use AptosFramework::Coin::{Self, Coin, BurnCapability, MintCapability};
     
@@ -92,6 +93,14 @@ module Aubrium::XYKAMM {
         Coin::mint<LiquidityCoin<Asset0Type, Asset1Type>>(liquidity, &pair.mint_capability)
     }
 
+    public(script) fun mint_script<Asset0Type, Asset1Type>(account: &signer, amount0: u64, amount1: u64) acquires Pair {
+        let coin0 = Coin::withdraw<Asset0Type>(account, amount0);
+        let coin1 = Coin::withdraw<Asset1Type>(account, amount1);
+        let sender = Signer::address_of(account);
+        if (!Coin::is_account_registered<LiquidityCoin<Asset0Type, Asset1Type>>(sender)) Coin::register_internal<LiquidityCoin<Asset0Type, Asset1Type>>(account);
+        Coin::deposit(sender, mint(coin0, coin1));
+    }
+
     public fun burn<Asset0Type, Asset1Type>(liquidity: Coin<LiquidityCoin<Asset0Type, Asset1Type>>): (Coin<Asset0Type>, Coin<Asset1Type>) acquires Pair {
         // get pair reserves
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
@@ -111,6 +120,16 @@ module Aubrium::XYKAMM {
         
         // withdraw tokens and return
         (Coin::extract(&mut pair.coin0, amount0), Coin::extract(&mut pair.coin1, amount1))
+    }
+
+    public(script) fun burn_script<Asset0Type, Asset1Type>(account: &signer, liquidity: u64) acquires Pair {
+        let liquidity_coin = Coin::withdraw<LiquidityCoin<Asset0Type, Asset1Type>>(account, liquidity);
+        let sender = Signer::address_of(account);
+        if (!Coin::is_account_registered<Asset0Type>(sender)) Coin::register_internal<Asset0Type>(account);
+        if (!Coin::is_account_registered<Asset1Type>(sender)) Coin::register_internal<Asset1Type>(account);
+        let (coin0, coin1) = burn(liquidity_coin);
+        Coin::deposit(sender, coin0);
+        Coin::deposit(sender, coin1);
     }
 
     public fun swap<In, Out>(coin_in: Coin<In>, amount_out_min: u64): Coin<Out> acquires Pair {
@@ -156,10 +175,27 @@ module Aubrium::XYKAMM {
         }
     }
 
+    public(script) fun swap_script<In, Out>(account: &signer, amount_in: u64, amount_out_min: u64) acquires Pair {
+        let coin_in = Coin::withdraw<In>(account, amount_in);
+        let sender = Signer::address_of(account);
+        if (!Coin::is_account_registered<Out>(sender)) Coin::register_internal<Out>(account);
+        Coin::deposit(sender, swap<In, Out>(coin_in, amount_out_min));
+    }
+
+    // TODO: add amount_in_max param or expect coin_in param to be split up beforehand?
     public fun swap_to<In, Out>(coin_in: &mut Coin<In>, amount_out: u64): Coin<Out> acquires Pair {
         let amount_in = get_amount_in<In, Out>(amount_out);
         let coin_in_swap = Coin::extract(coin_in, amount_in);
         swap<In, Out>(coin_in_swap, amount_out)
+    }
+
+    public(script) fun swap_to_script<In, Out>(account: &signer, amount_out: u64, amount_in_max: u64) acquires Pair {
+        let amount_in = get_amount_in<In, Out>(amount_out);
+        assert!(amount_in <= amount_in_max, 1000); // EXCESSIVE_INPUT_AMOUNT
+        let coin_in = Coin::withdraw<In>(account, amount_in);
+        let sender = Signer::address_of(account);
+        if (!Coin::is_account_registered<Out>(sender)) Coin::register_internal<Out>(account);
+        Coin::deposit(sender, swap<In, Out>(coin_in, amount_out));
     }
 
     public fun get_reserves<In, Out>(): (u64, u64) acquires Pair {
@@ -223,6 +259,26 @@ module Aubrium::XYKAMM {
         if (exists<Pair<Asset0Type, Asset1Type>>(@Aubrium)) return 1;
         if (exists<Pair<Asset1Type, Asset0Type>>(@Aubrium)) return 2;
         0
+    }
+
+    public(script) fun accept_script<Asset0Type, Asset1Type>(root: &signer) {
+        accept<Asset0Type, Asset1Type>(root)
+    }
+
+    public(script) fun get_reserves_script<In, Out>(): (u64, u64) acquires Pair {
+        get_reserves<In, Out>()
+    }
+
+    public(script) fun get_amount_out_script<In, Out>(amount_in: u64): u64 acquires Pair {
+        get_amount_out<In, Out>(amount_in)
+    }
+
+    public(script) fun get_amount_in_script<In, Out>(amount_out: u64): u64 acquires Pair {
+        get_amount_in<In, Out>(amount_out)
+    }
+
+    public(script) fun find_pair_script<Asset0Type, Asset1Type>(): u8 {
+        find_pair<Asset0Type, Asset1Type>()
     }
 
     #[test_only]
