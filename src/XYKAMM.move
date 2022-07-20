@@ -12,10 +12,15 @@ module Aubrium::XYKAMM {
         coin1: Coin<Asset1Type>,
         mint_capability: MintCapability<LiquidityCoin<Asset0Type, Asset1Type>>,
         burn_capability: BurnCapability<LiquidityCoin<Asset0Type, Asset1Type>>,
-        locked_liquidity: Coin<LiquidityCoin<Asset0Type, Asset1Type>>
+        locked_liquidity: Coin<LiquidityCoin<Asset0Type, Asset1Type>>,
+        entrancy_locked: bool
     }
 
     struct LiquidityCoin<phantom Asset0Type, phantom Asset1Type> { }
+
+    struct FlashloanReceipt<phantom Out, phantom Base> {
+        amount_out: u64
+    }
 
     public fun accept<Asset0Type, Asset1Type>(root: &signer) {
         // make sure pair does not exist already
@@ -38,7 +43,8 @@ module Aubrium::XYKAMM {
             coin1: Coin::zero<Asset1Type>(),
             mint_capability,
             burn_capability,
-            locked_liquidity: Coin::zero<LiquidityCoin<Asset0Type, Asset1Type>>()
+            locked_liquidity: Coin::zero<LiquidityCoin<Asset0Type, Asset1Type>>(),
+            entrancy_locked: false
         })
     }
 
@@ -64,6 +70,7 @@ module Aubrium::XYKAMM {
         // get pair reserves
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(@Aubrium);
+        assert!(!*&pair.entrancy_locked, 1000); // LOCKED
         let reserve0 = Coin::value(&pair.coin0);
         let reserve1 = Coin::value(&pair.coin1);
 
@@ -105,6 +112,7 @@ module Aubrium::XYKAMM {
         // get pair reserves
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(@Aubrium);
+        assert!(!*&pair.entrancy_locked, 1000); // LOCKED
         let reserve0 = Coin::value(&pair.coin0);
         let reserve1 = Coin::value(&pair.coin1);
         
@@ -140,6 +148,7 @@ module Aubrium::XYKAMM {
         if (exists<Pair<In, Out>>(@Aubrium)) {
             // get pair reserves
             let pair = borrow_global_mut<Pair<In, Out>>(@Aubrium);
+            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
             let reserve_in = Coin::value(&pair.coin0);
             let reserve_out = Coin::value(&pair.coin1);
 
@@ -159,6 +168,7 @@ module Aubrium::XYKAMM {
 
             // get pair reserves
             let pair = borrow_global_mut<Pair<Out, In>>(@Aubrium);
+            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
             let reserve_in = Coin::value(&pair.coin1);
             let reserve_out = Coin::value(&pair.coin0);
 
@@ -196,6 +206,90 @@ module Aubrium::XYKAMM {
         let sender = Signer::address_of(account);
         if (!Coin::is_account_registered<Out>(sender)) Coin::register_internal<Out>(account);
         Coin::deposit(sender, swap<In, Out>(coin_in, amount_out));
+    }
+
+    // function that returns tokens and a receipt that must be passed back into repay_out or repay_base along with flashloan repayment
+    public fun flashloan<Out, Base>(amount_out: u64): (Coin<Out>, FlashloanReceipt<Out, Base>) acquires Pair {
+        // input validation
+        assert!(amount_out > 0, 1004); // INSUFFICIENT_OUTPUT_AMOUNT
+
+        // get amount out + deposit + withdraw
+        if (exists<Pair<Out, Base>>(@Aubrium)) {
+            // get pair reserves
+            let pair = borrow_global_mut<Pair<Out, Base>>(@Aubrium);
+            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+            let reserve_out = Coin::value(&pair.coin0);
+
+            // validation
+            assert!(amount_out < reserve_out, 1005); // INSUFFICIENT_LIQUIDITY
+
+            // prevent reentrancy
+            *&mut pair.entrancy_locked = true;
+        
+            // withdraw output tokens and return them along with receipt
+            (Coin::extract(&mut pair.coin0, amount_out), FlashloanReceipt<Out, Base> { amount_out })
+        } else {
+            // assert pair exists
+            assert!(exists<Pair<Base, Out>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
+
+            // get pair reserves
+            let pair = borrow_global_mut<Pair<Base, Out>>(@Aubrium);
+            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+            let reserve_out = Coin::value(&pair.coin1);
+
+            // validation
+            assert!(amount_out < reserve_out, 1005); // INSUFFICIENT_LIQUIDITY
+
+            // prevent reentrancy
+            *&mut pair.entrancy_locked = true;
+
+            // withdraw output tokens and return them along with receipt
+            (Coin::extract(&mut pair.coin1, amount_out), FlashloanReceipt<Out, Base> { amount_out })
+        }
+    }
+
+    public fun repay_out<Out, Base>(coin_repay: Coin<Out>, flashloan_receipt: FlashloanReceipt<Out, Base>) acquires Pair {
+        // destroy flashloan receipt, get amount sent out, and calc min amount in
+        let FlashloanReceipt { amount_out } = flashloan_receipt;
+        let min_repay_amount = (amount_out * 1000 / 997) + 1;
+
+        // get amount repaid and ensure it is enough
+        let repay_amount = Coin::value(&coin_repay);
+        assert!(repay_amount >= min_repay_amount, 1000); // INSUFFICIENT_INPUT_AMOUNT
+
+        // repay flashloan
+        if (exists<Pair<Out, Base>>(@Aubrium)) {
+            let pair = borrow_global_mut<Pair<Out, Base>>(@Aubrium);
+            *&mut pair.entrancy_locked = false;
+            Coin::merge(&mut pair.coin0, coin_repay);
+        } else {
+            assert!(exists<Pair<Base, Out>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
+            let pair = borrow_global_mut<Pair<Base, Out>>(@Aubrium);
+            *&mut pair.entrancy_locked = false;
+            Coin::merge(&mut pair.coin1, coin_repay);
+        }
+    }
+
+    public fun repay_base<Out, Base>(coin_repay: Coin<Base>, flashloan_receipt: FlashloanReceipt<Out, Base>) acquires Pair {
+        // destroy flashloan receipt, get amount sent out, and calc min amount in
+        let FlashloanReceipt { amount_out } = flashloan_receipt;
+        let min_repay_amount = get_amount_in<Base, Out>(amount_out);
+
+        // get amount in
+        let repay_amount = Coin::value(&coin_repay);
+        assert!(repay_amount >= min_repay_amount, 1000); // INSUFFICIENT_INPUT_AMOUNT
+
+        // repay flashloan
+        if (exists<Pair<Out, Base>>(@Aubrium)) {
+            let pair = borrow_global_mut<Pair<Out, Base>>(@Aubrium);
+            *&mut pair.entrancy_locked = false;
+            Coin::merge(&mut pair.coin1, coin_repay);
+        } else {
+            assert!(exists<Pair<Base, Out>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
+            let pair = borrow_global_mut<Pair<Base, Out>>(@Aubrium);
+            *&mut pair.entrancy_locked = false;
+            Coin::merge(&mut pair.coin0, coin_repay);
+        }
     }
 
     public fun get_reserves<In, Out>(): (u64, u64) acquires Pair {
