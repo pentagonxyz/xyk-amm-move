@@ -48,12 +48,12 @@ module Aubrium::XYKAMM {
         })
     }
 
-    fun min(x: u64, y: u64): u64 {
+    fun min(x: u128, y: u128): u128 {
         if (x < y) x else y
     }
     
     // babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
-    fun sqrt(y: u64): u64 {
+    fun sqrt(y: u128): u128 {
         if (y > 3) {
             let z = y;
             let x = y / 2 + 1;
@@ -71,23 +71,23 @@ module Aubrium::XYKAMM {
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(@Aubrium);
         assert!(!pair.entrancy_locked, 1000); // LOCKED
-        let reserve0 = Coin::value(&pair.coin0);
-        let reserve1 = Coin::value(&pair.coin1);
+        let reserve0 = (Coin::value(&pair.coin0) as u128);
+        let reserve1 = (Coin::value(&pair.coin1) as u128);
 
         // get deposited amounts
-        let amount0 = Coin::value(&coin0);
-        let amount1 = Coin::value(&coin1);
+        let amount0 = (Coin::value(&coin0) as u128);
+        let amount1 = (Coin::value(&coin1) as u128);
         
         // calc liquidity to mint from deposited amounts
         let liquidity;
         let total_supply = *Option::borrow(&Coin::supply<LiquidityCoin<Asset0Type, Asset1Type>>());
 
         if (total_supply == 0) {
-            liquidity = sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
+            liquidity = (sqrt(amount0 * amount1) as u64) - MINIMUM_LIQUIDITY;
             let locked_liquidity = Coin::mint<LiquidityCoin<Asset0Type, Asset1Type>>(MINIMUM_LIQUIDITY, &pair.mint_capability); // permanently lock the first MINIMUM_LIQUIDITY tokens
             Coin::merge(&mut pair.locked_liquidity, locked_liquidity);
         } else {
-            liquidity = min(amount0 * total_supply / reserve0, amount1 * total_supply / reserve1);
+            liquidity = (min(amount0 * total_supply / reserve0, amount1 * total_supply / reserve1) as u64);
         };
 
         assert!(liquidity > 0, 1001); // INSUFFICIENT_LIQUIDITY_MINTED
@@ -117,10 +117,10 @@ module Aubrium::XYKAMM {
         let reserve1 = Coin::value(&pair.coin1);
         
         // get amounts to withdraw from burnt liquidity
-        let liquidity_value = Coin::value(&liquidity);
+        let liquidity_value = (Coin::value(&liquidity) as u128);
         let total_supply = *Option::borrow(&Coin::supply<LiquidityCoin<Asset0Type, Asset1Type>>());
-        let amount0 = liquidity_value * reserve0 / total_supply; // using balances ensures pro-rata distribution
-        let amount1 = liquidity_value * reserve1 / total_supply; // using balances ensures pro-rata distribution
+        let amount0 = (liquidity_value * (reserve0 as u128) / total_supply as u64); // using balances ensures pro-rata distribution
+        let amount1 = (liquidity_value * (reserve1 as u128) / total_supply as u64); // using balances ensures pro-rata distribution
         assert!(amount0 > 0 && amount1 > 0, 1002); // INSUFFICIENT_LIQUIDITY_BURNED
         
         // burn liquidity
@@ -317,10 +317,10 @@ module Aubrium::XYKAMM {
         assert!(reserve_in > 0 && reserve_out > 0, 1005); // INSUFFICIENT_LIQUIDITY
 
         // calc amount out
-        let amount_in_with_fee = amount_in * 997;
-        let numerator = amount_in_with_fee * reserve_out;
-        let denominator = (reserve_in * 1000) + amount_in_with_fee;
-        numerator / denominator
+        let amount_in_with_fee = (amount_in as u128) * 997;
+        let numerator = amount_in_with_fee * (reserve_out as u128);
+        let denominator = ((reserve_in as u128) * 1000) + amount_in_with_fee;
+        (numerator / denominator as u64)
     }
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
@@ -342,9 +342,9 @@ module Aubrium::XYKAMM {
         assert!(reserve_in > 0 && reserve_out > 0, 1005); // INSUFFICIENT_LIQUIDITY
 
         // calc amount in
-        let numerator = reserve_in * amount_out * 1000;
-        let denominator = reserve_out - (amount_out * 997);
-        (numerator / denominator) + 1
+        let numerator = (reserve_in as u128) * (amount_out as u128) * 1000;
+        let denominator = (reserve_out as u128) - ((amount_out as u128) * 997);
+        (numerator / denominator as u64) + 1
     }
 
     // returns 1 if found Pair<Asset0Type, Asset1Type>, 2 if found Pair<Asset1Type, Asset0Type>, or 0 if pair does not exist
