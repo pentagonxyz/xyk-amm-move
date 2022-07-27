@@ -70,7 +70,7 @@ module Aubrium::XYKAMM {
         // get pair reserves
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(@Aubrium);
-        assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+        assert!(!pair.entrancy_locked, 1000); // LOCKED
         let reserve0 = Coin::value(&pair.coin0);
         let reserve1 = Coin::value(&pair.coin1);
 
@@ -112,7 +112,7 @@ module Aubrium::XYKAMM {
         // get pair reserves
         assert!(exists<Pair<Asset0Type, Asset1Type>>(@Aubrium), 1006); // PAIR_DOES_NOT_EXIST
         let pair = borrow_global_mut<Pair<Asset0Type, Asset1Type>>(@Aubrium);
-        assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+        assert!(!pair.entrancy_locked, 1000); // LOCKED
         let reserve0 = Coin::value(&pair.coin0);
         let reserve1 = Coin::value(&pair.coin1);
         
@@ -148,7 +148,7 @@ module Aubrium::XYKAMM {
         if (exists<Pair<In, Out>>(@Aubrium)) {
             // get pair reserves
             let pair = borrow_global_mut<Pair<In, Out>>(@Aubrium);
-            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+            assert!(!pair.entrancy_locked, 1000); // LOCKED
             let reserve_in = Coin::value(&pair.coin0);
             let reserve_out = Coin::value(&pair.coin1);
 
@@ -168,7 +168,7 @@ module Aubrium::XYKAMM {
 
             // get pair reserves
             let pair = borrow_global_mut<Pair<Out, In>>(@Aubrium);
-            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+            assert!(!pair.entrancy_locked, 1000); // LOCKED
             let reserve_in = Coin::value(&pair.coin1);
             let reserve_out = Coin::value(&pair.coin0);
 
@@ -217,7 +217,7 @@ module Aubrium::XYKAMM {
         if (exists<Pair<Out, Base>>(@Aubrium)) {
             // get pair reserves
             let pair = borrow_global_mut<Pair<Out, Base>>(@Aubrium);
-            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+            assert!(!pair.entrancy_locked, 1000); // LOCKED
             let reserve_out = Coin::value(&pair.coin0);
 
             // validation
@@ -234,7 +234,7 @@ module Aubrium::XYKAMM {
 
             // get pair reserves
             let pair = borrow_global_mut<Pair<Base, Out>>(@Aubrium);
-            assert!(!*&pair.entrancy_locked, 1000); // LOCKED
+            assert!(!pair.entrancy_locked, 1000); // LOCKED
             let reserve_out = Coin::value(&pair.coin1);
 
             // validation
