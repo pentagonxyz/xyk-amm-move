@@ -100,7 +100,7 @@ module Aubrium::XYKAMM {
         Coin::mint<LiquidityCoin<Asset0Type, Asset1Type>>(liquidity, &pair.mint_capability)
     }
 
-    public(script) fun mint_script<Asset0Type, Asset1Type>(account: &signer, amount0: u64, amount1: u64) acquires Pair {
+    public entry fun mint_script<Asset0Type, Asset1Type>(account: &signer, amount0: u64, amount1: u64) acquires Pair {
         let coin0 = Coin::withdraw<Asset0Type>(account, amount0);
         let coin1 = Coin::withdraw<Asset1Type>(account, amount1);
         let sender = Signer::address_of(account);
@@ -130,7 +130,7 @@ module Aubrium::XYKAMM {
         (Coin::extract(&mut pair.coin0, amount0), Coin::extract(&mut pair.coin1, amount1))
     }
 
-    public(script) fun burn_script<Asset0Type, Asset1Type>(account: &signer, liquidity: u64) acquires Pair {
+    public entry fun burn_script<Asset0Type, Asset1Type>(account: &signer, liquidity: u64) acquires Pair {
         let liquidity_coin = Coin::withdraw<LiquidityCoin<Asset0Type, Asset1Type>>(account, liquidity);
         let sender = Signer::address_of(account);
         if (!Coin::is_account_registered<Asset0Type>(sender)) Coin::register_internal<Asset0Type>(account);
@@ -185,7 +185,7 @@ module Aubrium::XYKAMM {
         }
     }
 
-    public(script) fun swap_script<In, Out>(account: &signer, amount_in: u64, amount_out_min: u64) acquires Pair {
+    public entry fun swap_script<In, Out>(account: &signer, amount_in: u64, amount_out_min: u64) acquires Pair {
         let coin_in = Coin::withdraw<In>(account, amount_in);
         let sender = Signer::address_of(account);
         if (!Coin::is_account_registered<Out>(sender)) Coin::register_internal<Out>(account);
@@ -199,7 +199,7 @@ module Aubrium::XYKAMM {
         swap<In, Out>(coin_in_swap, amount_out)
     }
 
-    public(script) fun swap_to_script<In, Out>(account: &signer, amount_out: u64, amount_in_max: u64) acquires Pair {
+    public entry fun swap_to_script<In, Out>(account: &signer, amount_out: u64, amount_in_max: u64) acquires Pair {
         let amount_in = get_amount_in<In, Out>(amount_out);
         assert!(amount_in <= amount_in_max, 1000); // EXCESSIVE_INPUT_AMOUNT
         let coin_in = Coin::withdraw<In>(account, amount_in);
@@ -355,23 +355,23 @@ module Aubrium::XYKAMM {
         0
     }
 
-    public(script) fun accept_script<Asset0Type, Asset1Type>(root: &signer) {
+    public entry fun accept_script<Asset0Type, Asset1Type>(root: &signer) {
         accept<Asset0Type, Asset1Type>(root)
     }
 
-    public(script) fun get_reserves_script<In, Out>(): (u64, u64) acquires Pair {
+    public entry fun get_reserves_script<In, Out>(): (u64, u64) acquires Pair {
         get_reserves<In, Out>()
     }
 
-    public(script) fun get_amount_out_script<In, Out>(amount_in: u64): u64 acquires Pair {
+    public entry fun get_amount_out_script<In, Out>(amount_in: u64): u64 acquires Pair {
         get_amount_out<In, Out>(amount_in)
     }
 
-    public(script) fun get_amount_in_script<In, Out>(amount_out: u64): u64 acquires Pair {
+    public entry fun get_amount_in_script<In, Out>(amount_out: u64): u64 acquires Pair {
         get_amount_in<In, Out>(amount_out)
     }
 
-    public(script) fun find_pair_script<Asset0Type, Asset1Type>(): u8 {
+    public entry fun find_pair_script<Asset0Type, Asset1Type>(): u8 {
         find_pair<Asset0Type, Asset1Type>()
     }
 
@@ -388,7 +388,7 @@ module Aubrium::XYKAMM {
     }
 
     #[test(root = @Aubrium, coin_creator = @0x1000)]
-    public(script) fun end_to_end(root: signer, coin_creator: signer) acquires Pair {
+    public entry fun end_to_end(root: signer, coin_creator: signer) acquires Pair {
         // init 2 fake coins
         let (mint_cap_a, burn_cap_a) = Coin::initialize<FakeMoneyA>(
             &coin_creator,
