@@ -1,19 +1,9 @@
 [package]
-name = "Aubrium"
-version = "1.0.0"
-authors = ["David Lucid <david@pentagon.xyz>"]
+name = "SuiMoveTemplate"
+version = "0.0.1"
+
+[dependencies]
+Sui = { local = "./lib/sui-framework" }
 
 [addresses]
-Std = "0x1"
-AptosFramework = "0x1"
-Aubrium = "0xfc845c20a3d7b9e8478c675f14357646782e80c916a96a0627664b6e3c87a89d"
-
-[dependencies.MoveStdlib]
-git = "https://github.com/aptos-labs/aptos-core.git"
-subdir = "aptos-move/framework/move-stdlib"
-rev = "6538efd8bf4b37c61ec0427243e864ee038df5e8"
-
-[dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-core.git"
-subdir = "aptos-move/framework/aptos-framework"
-rev = "6538efd8bf4b37c61ec0427243e864ee038df5e8"
+template = "0x0"
