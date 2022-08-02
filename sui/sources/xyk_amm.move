@@ -1,5 +1,5 @@
 // Constant product AMM (like Uniswap V2) for swapping Coin objects.
-module aubrium::automated_market_maker {
+module aubrium::xyk_amm {
     use sui::transfer::{Self};
     use sui::object::{Self, Info};
     use sui::tx_context::TxContext;
@@ -95,7 +95,7 @@ module aubrium::automated_market_maker {
         let total_supply = coin::total_supply(&pair.lp_treasury_capability);
 
         // If the total supply is zero, calculate the amount using the inputted token amounts.
-        if(total_supply == 0) {
+        if (total_supply == 0) {
             // Calculate the excess and locked liquidity.
             liquidity = (math::sqrt(deposit1 * deposit2) as u64) - MINIMUM_LIQUIDITY;
             let locked_liquidity = coin::mint<LiquidityCoin<Asset1, Asset2>>(
@@ -219,10 +219,8 @@ module aubrium::automated_market_maker {
         coin::take<Asset1>(coin::balance_mut<Asset1>(&mut pair.coin1), amount_out, ctx)
     }
 
-
-
     // Given the reserves and number of coins being sold, calculate the amount of coins to sell.
-    fun calculate_amount_out(reserve_in: u64, reserve_out: u64, amount_in: u64): u64 {
+    public fun calculate_amount_out(reserve_in: u64, reserve_out: u64, amount_in: u64): u64 {
         // Input validation.
         assert!(amount_in > 0, EInsufficientInput);
         assert!(reserve_in > 0 && reserve_out > 0, EInsufficientLiquidity);
