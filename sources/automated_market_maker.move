@@ -45,11 +45,20 @@ module aubrium::automated_market_maker{
     // Attempt to create a pair with the same assets as an existing pair.
     const EPairExists: u64 = 0;
 
-    // An insufficient number of liquidity was provided/minted.
+    // An insufficient amount of liquidity was provided/minted.
     const EInsufficientLiquidityMinted: u64 = 1;
 
-    // An insufficient number of liquidity was removed/burned.
+    // An insufficient amount of liquidity was removed/burned.
     const EInsufficientLiquidityBurned: u64 = 2;
+
+    // An insufficient number of coins was inputted for a swap.
+    const EInsufficientInput: u64 = 3;
+
+    // There is an insufficient amount of liquidity in the pool.
+    const EInsufficientLiquidity: u64 = 4;
+
+    // The amount of minimum output tokens requested is too large.
+    const EInsufficientOutputAmount: u64 = 5;
 
     
     ///*///////////////////////////////////////////////////////////////
@@ -177,4 +186,75 @@ module aubrium::automated_market_maker{
         )
     }
 
+    ///*///////////////////////////////////////////////////////////////
+    //                          SWAPPING LOGIC                       //
+    /////////////////////////////////////////////////////////////////*/
+
+    // Sell asset1 for asset2.
+    public fun sell<Asset1, Asset2>(
+        pair: &mut Pair<Asset1, Asset2>, 
+        coin_in: Coin<Asset1>, min_amount_out: u64, 
+        ctx: &mut TxContext
+    ): Coin<Asset2> {
+        // Get the amount of asset1 being sold.
+        let amount_in = coin::value(&coin_in);
+
+        // Get our pair reserves.
+        let reserve_in = coin::value(&pair.coin1);
+        let reserve_out = coin::value(&pair.coin2);
+
+        // Get the amount of asset2 to buy.
+        let amount_out = calculate_amount_out(reserve_in, reserve_out, amount_in);
+
+        // Ensure that the amount of asset2 to buy is sufficient.
+        assert!(amount_out >= min_amount_out, EInsufficientOutputAmount);
+        assert!(amount_out <= reserve_out, EInsufficientLiquidity);
+
+        // Sell input tokens for output tokens and return them.
+        coin::join(&mut pair.coin1, coin_in);
+        coin::take<Asset2>(coin::balance_mut<Asset2>(&mut pair.coin2), amount_out, ctx)
+
+    }
+
+    // Buy asset1 for asset2.
+    public fun buy<Asset1, Asset2>(
+        pair: &mut Pair<Asset1, Asset2>, 
+        coin_in: Coin<Asset2>, min_amount_out: u64, 
+        ctx: &mut TxContext
+    ): Coin<Asset1> {
+        // Get the amount of asset1 being sold.
+        let amount_in = coin::value(&coin_in);
+
+        // Get our pair reserves.
+        let reserve_in = coin::value(&pair.coin2);
+        let reserve_out = coin::value(&pair.coin1);
+
+        // Get the amount of asset1 to buy.
+        let amount_out = calculate_amount_out(reserve_in, reserve_out, amount_in);
+
+        // Ensure that the amount of asset2 to buy is sufficient.
+        assert!(amount_out >= min_amount_out, EInsufficientOutputAmount);
+        assert!(amount_out <= reserve_out, EInsufficientLiquidity);
+
+        // Sell input tokens for output tokens and return them.
+        coin::join(&mut pair.coin2, coin_in);
+        coin::take<Asset1>(coin::balance_mut<Asset1>(&mut pair.coin1), amount_out, ctx)
+    }
+
+
+
+    // Given the reserves and number of coins being sold, calculate the amount of coins to sell.
+    fun calculate_amount_out(reserve_in: u64, reserve_out: u64, amount_in: u64): u64 {
+        // Input validation.
+        assert!(amount_in > 0, EInsufficientInput);
+        assert!(reserve_in > 0 && reserve_out > 0, EInsufficientLiquidity);
+
+        // Calculate the amount of asset2 to buy.
+        let amount_in_with_fee = (amount_in as u128) * 997; // 0.3% fee.
+        let numerator = amount_in_with_fee * (reserve_out as u128); 
+        let denominator = ((reserve_in as u128) * 1000) + amount_in_with_fee;
+
+        // Return the amount of asset2 to buy.
+        (numerator/denominator as u64)
+    }
 }
