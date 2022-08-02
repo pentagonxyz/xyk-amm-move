@@ -1,6 +1,7 @@
 [package]
-name = "SuiMoveTemplate"
-version = "0.0.1"
+name = "Aubrium"
+version = "1.0.0"
+authors = ["David Lucid <david@pentagon.xyz>"]
 
 [dependencies]
 Sui = { local = "./lib/sui-framework" }
