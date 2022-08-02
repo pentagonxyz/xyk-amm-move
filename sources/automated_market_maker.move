@@ -159,8 +159,10 @@ module aubrium::automated_market_maker{
         // Ensure that enough liquidity was burned.
         assert!(amount1 > 0 && amount2 > 0, EInsufficientLiquidityBurned);
 
-        // Burn liquidity and return the tokens.
-        let coin1 = coin::burn<LiquidityCoin<Asset1, Asset2>>(&mut pair.lp_treasury_capability, lp_tokens);
+        // Burn liquidity.
+        coin::burn<LiquidityCoin<Asset1, Asset2>>(&mut pair.lp_treasury_capability, lp_tokens);
+
+        // Return the liquidity back to the liquidity provider.
         (
             coin::take<Asset1>(
                 coin::balance_mut<Asset1>(&mut pair.coin1), 
