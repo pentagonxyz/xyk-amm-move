@@ -1,0 +1,10 @@
+[package]
+name = "Aubrium"
+version = "1.0.0"
+authors = ["David Lucid <david@pentagon.xyz>"]
+
+[dependencies]
+Sui = { local = "./lib/sui-framework" }
+
+[addresses]
+aubrium = "0x0"
