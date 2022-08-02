@@ -1,8 +1,8 @@
 // Constant product AMM (like Uniswap V2) for swapping Coin objects.
-module aubrium::automated_market_maker{
+module aubrium::automated_market_maker {
     use sui::transfer::{Self};
-    use sui::object::{Self, ID, Info};
-    use sui::tx_context::{Self, TxContext};
+    use sui::object::{Self, Info};
+    use sui::tx_context::TxContext;
     use sui::coin::{Self, Coin, TreasuryCap};
     use sui::math::{Self};
 
@@ -30,23 +30,20 @@ module aubrium::automated_market_maker{
     //                           ERROR CODES                         //
     /////////////////////////////////////////////////////////////////*/
 
-    // Attempt to create a pair with the same assets as an existing pair.
-    const EPairExists: u64 = 0;
-
     // An insufficient amount of liquidity was provided/minted.
-    const EInsufficientLiquidityMinted: u64 = 1;
+    const EInsufficientLiquidityMinted: u64 = 0;
 
     // An insufficient amount of liquidity was removed/burned.
-    const EInsufficientLiquidityBurned: u64 = 2;
+    const EInsufficientLiquidityBurned: u64 = 1;
 
     // An insufficient number of coins was inputted for a swap.
-    const EInsufficientInput: u64 = 3;
+    const EInsufficientInput: u64 = 2;
 
     // There is an insufficient amount of liquidity in the pool.
-    const EInsufficientLiquidity: u64 = 4;
+    const EInsufficientLiquidity: u64 = 3;
 
     // The amount of minimum output tokens requested is too large.
-    const EInsufficientOutputAmount: u64 = 5;
+    const EInsufficientOutputAmount: u64 = 4;
 
     
     ///*///////////////////////////////////////////////////////////////
@@ -55,10 +52,6 @@ module aubrium::automated_market_maker{
 
     // Creates a new pool/pair of coins.
     public fun new_pair<Asset1, Asset2>(ctx: &mut TxContext) {
-        // Ensure that the pair does not already exist.
-        assert!(!exists<Pair<Asset1, Asset2>>(@aubrium), EPairExists);
-        assert!(!exists<Pair<Asset2, Asset1>>(@aubrium), EPairExists);
-
         // Create a new token to represent the pair's lp token.
         let lp_treasury_capability = coin::create_currency<LiquidityCoin<Asset1, Asset2>>(
             LiquidityCoin<Asset1, Asset2>{}, 
@@ -140,9 +133,6 @@ module aubrium::automated_market_maker{
         lp_tokens: Coin<LiquidityCoin<Asset1, Asset2>>,
         ctx: &mut TxContext
     ): (Coin<Asset1>, Coin<Asset2>) {
-        // Ensure that the pair exists.
-        assert!(exists<Pair<Asset1, Asset2>>(@aubrium), EPairExists);
-
         // Get reserves from the pool.
         let reserve1 = coin::value(&pair.coin1);
         let reserve2 = coin::value(&pair.coin2);
