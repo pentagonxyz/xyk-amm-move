@@ -6,4 +6,4 @@ version = "0.0.1"
 Sui = { local = "./lib/sui-framework" }
 
 [addresses]
-template = "0x0"
+aubrium = "0x0"
