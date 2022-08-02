@@ -27,18 +27,6 @@ module aubrium::automated_market_maker{
     struct LiquidityCoin<phantom Asset1, phantom Asset2> has drop { }
 
     ///*///////////////////////////////////////////////////////////////
-    //                        FLASH LOAN OBJECTS                     //
-    /////////////////////////////////////////////////////////////////*/
-
-    // Represents a flashloan receipt. Since it does not implement any abilities, it cannot be
-    // stored or transferred. It also cannot be destroyed by anyone other than this module,
-    // which means that the only way to get rid of it (and avoid the tx from reverting)
-    // is to call the `repay` function.
-    struct FlashloanReceipt {
-        amount_out: u64,
-    }
-
-    ///*///////////////////////////////////////////////////////////////
     //                           ERROR CODES                         //
     /////////////////////////////////////////////////////////////////*/
 
