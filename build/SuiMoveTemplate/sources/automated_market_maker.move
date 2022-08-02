@@ -16,7 +16,6 @@ module aubrium::automated_market_maker{
 
     // Represents a pool/pair of two contracts that can be exchanged for one another.
     struct Pair<phantom Asset1, phantom Asset2> has key, store {
-        info: Info,
         coin1: Coin<Asset1>,
         coin2: Coin<Asset2>,
         locked_liquidity: Coin<LiquidityCoin<Asset1, Asset2>>,
@@ -70,7 +69,6 @@ module aubrium::automated_market_maker{
 
         // Create a new pair object.
         let pair = Pair<Asset1, Asset2> {
-            info: object::new(ctx), 
             coin1: coin::zero<Asset1>(ctx),
             coin2: coin::zero<Asset2>(ctx),
             locked_liquidity: coin::zero<LiquidityCoin<Asset1, Asset2>>(ctx),

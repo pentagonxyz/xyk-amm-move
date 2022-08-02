@@ -1,0 +1,21 @@
+---
+compiled_package_info:
+  package_name: SuiMoveTemplate
+  address_alias_instantiation:
+    aubrium: "0000000000000000000000000000000000000000"
+    std: "0000000000000000000000000000000000000001"
+    sui: "0000000000000000000000000000000000000002"
+  source_digest: C08FCAEF69B02772D92698241BABEEFC7339227B826A566F77903A564C402EDE
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    generate_abis: false
+    install_dir: ~
+    force_recompilation: false
+    additional_named_addresses: {}
+    architecture: ~
+    fetch_deps_only: false
+dependencies:
+  - MoveStdlib
+  - Sui
