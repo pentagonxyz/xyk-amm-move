@@ -4,6 +4,7 @@ module aubrium::xyk_amm {
     use std::signer;
 
     use aptos_framework::coin::{Self, Coin, BurnCapability, MintCapability};
+    use aptos_framework::coins;
     
     const MINIMUM_LIQUIDITY: u64 = 1000;
 
@@ -105,6 +106,7 @@ module aubrium::xyk_amm {
         let coin0 = coin::withdraw<Asset0Type>(account, amount0);
         let coin1 = coin::withdraw<Asset1Type>(account, amount1);
         let sender = signer::address_of(account);
+        if (!coin::is_account_registered<LiquidityCoin<Asset0Type, Asset1Type>>(sender)) coins::register_internal<LiquidityCoin<Asset0Type, Asset1Type>>(account);
         coin::deposit(sender, mint(coin0, coin1));
     }
 
@@ -135,6 +137,8 @@ module aubrium::xyk_amm {
         let liquidity_coin = coin::withdraw<LiquidityCoin<Asset0Type, Asset1Type>>(account, liquidity);
         let sender = signer::address_of(account);
         let (coin0, coin1) = burn(liquidity_coin);
+        if (!coin::is_account_registered<Asset0Type>(sender)) coins::register_internal<Asset0Type>(account);
+        if (!coin::is_account_registered<Asset1Type>(sender)) coins::register_internal<Asset1Type>(account);
         coin::deposit(sender, coin0);
         coin::deposit(sender, coin1);
     }
@@ -188,6 +192,7 @@ module aubrium::xyk_amm {
     public entry fun swap_script<In, Out>(account: &signer, amount_in: u64, amount_out_min: u64) acquires Pair {
         let coin_in = coin::withdraw<In>(account, amount_in);
         let sender = signer::address_of(account);
+        if (!coin::is_account_registered<Out>(sender)) coins::register_internal<Out>(account);
         coin::deposit(sender, swap<In, Out>(coin_in, amount_out_min));
     }
 
@@ -204,6 +209,7 @@ module aubrium::xyk_amm {
         assert!(amount_in <= amount_in_max, 1000); // EXCESSIVE_INPUT_AMOUNT
         let coin_in = coin::withdraw<In>(account, amount_in);
         let sender = signer::address_of(account);
+        if (!coin::is_account_registered<Out>(sender)) coins::register_internal<Out>(account);
         coin::deposit(sender, swap<In, Out>(coin_in, amount_out));
     }
 
