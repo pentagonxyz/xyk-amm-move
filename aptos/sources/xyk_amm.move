@@ -392,11 +392,11 @@ module aubrium::xyk_amm {
         burn_cap: BurnCapability<FakeMoneyType>,
     }
 
-    #[test(root = @aubrium, coin_creator = @0x1000)]
-    public entry fun end_to_end(root: signer, coin_creator: signer) acquires Pair {
+    #[test(root = @aubrium)]
+    public entry fun end_to_end(root: signer) acquires Pair {
         // init 2 fake coins
         let (mint_cap_a, burn_cap_a) = coin::initialize<FakeMoneyA>(
-            &coin_creator,
+            &root,
             string::utf8(b"Fake Money A"),
             string::utf8(b"FMA"),
             6,
@@ -404,12 +404,15 @@ module aubrium::xyk_amm {
         );
 
         let (mint_cap_b, burn_cap_b) = coin::initialize<FakeMoneyB>(
-            &coin_creator,
+            &root,
             string::utf8(b"Fake Money B"),
             string::utf8(b"FMB"),
             6,
             true
         );
+
+        // init pair
+        accept<FakeMoneyA, FakeMoneyB>(&root);
 
         // mint liquidity
         let coin0 = coin::mint<FakeMoneyA>(50000000, &mint_cap_a);
@@ -434,9 +437,10 @@ module aubrium::xyk_amm {
 
         // merge and burn liquidity
         coin::merge(&mut liquidity, liquidity2);
+        let liquidity_value = coin::value(&liquidity);
         let (coin0_from_burning, coin1_from_burning) = burn(liquidity);
-        assert!(coin::value(&coin0_from_burning) == 100053786, 1000); // 100054494 * ((70709678 + 70710678) / (70710678 * 2))
-        assert!(coin::value(&coin1_from_burning) == 200000000, 1000);
+        assert!(coin::value(&coin0_from_burning) == 100053786, 1000); // 100054494 * ((70709678 + 70710678) / (70710678 * 2));
+        assert!(coin::value(&coin1_from_burning) == 200000000 * liquidity_value / (liquidity_value + 1000), 1000); // Slight loss due to MINIMUM_LIQUIDITY
 
         // clean up: we can't drop coins so we burn them
         coin::burn(coin0_out, &burn_cap_a);
@@ -444,11 +448,11 @@ module aubrium::xyk_amm {
         coin::burn(coin1_from_burning, &burn_cap_b);
 
         // clean up: we can't drop mint/burn caps so we store them
-        move_to(&coin_creator, FakeMoneyCapabilities<FakeMoneyA>{
+        move_to(&root, FakeMoneyCapabilities<FakeMoneyA>{
             mint_cap: mint_cap_a,
             burn_cap: burn_cap_a,
         });
-        move_to(&coin_creator, FakeMoneyCapabilities<FakeMoneyB>{
+        move_to(&root, FakeMoneyCapabilities<FakeMoneyB>{
             mint_cap: mint_cap_b,
             burn_cap: burn_cap_b,
         });
