@@ -1,6 +1,6 @@
-# Aubrium: An Constant Product AMM on Sui and Aptos
+Constant Product AMM on Sui and Aptos
 
-Aubrium is a constant product (XY=K) AMM (like Uniswap V2) built in Sui Move and Aptos Move for swapping `coin`s.
+Constant product (XY=K) AMM (like Uniswap V2) built in Sui Move and Aptos Move for swapping `coin`s.
 
 ## Sui: Public Functions
 
